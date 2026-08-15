@@ -35,6 +35,38 @@ export function getTmdbOriginalUrl(path: string | null): string {
   return getTmdbImageUrl(path, 'original');
 }
 
+// TMDB Search result types
+export interface TMDBSearchResult {
+  id: number;
+  name: string;
+  original_name: string;
+  overview?: string;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  first_air_date?: string;
+  popularity: number;
+  vote_average: number;
+  vote_count: number;
+  origin_country: string[];
+  genre_ids?: number[];
+  number_of_seasons?: number;
+  number_of_episodes?: number;
+}
+
+export interface TMDBSearchResponse {
+  page: number;
+  results: TMDBSearchResult[];
+  total_pages: number;
+  total_results: number;
+}
+
+export async function searchShows(query: string, year?: number): Promise<TMDBSearchResponse> {
+  let endpoint = `/search/tv?query=${encodeURIComponent(query)}`;
+  if (year) endpoint += `&first_air_date_year=${year}`;
+  endpoint += '&include_adult=false';
+  return tmdbFetch<TMDBSearchResponse>(endpoint);
+}
+
 export async function getShowDetails(tmdbId: number): Promise<TMDBShow> {
   return tmdbFetch<TMDBShow>(`/tv/${tmdbId}`);
 }

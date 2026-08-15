@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getMapping } from '@/lib/mappings';
+import { aiMapAnilistToTmdb } from '@/lib/ai-mapping';
 import { getShowDetails, getSeasonEpisodes, getShowImages, getTmdbImageUrl, getTmdbOriginalUrl } from '@/lib/tmdb';
 import { getAnilistInfo } from '@/lib/anilist';
-import { EpisodeResponse, AnimeEpisode, TMDBSeasonMapping } from '@/lib/types';
+import { EpisodeResponse, AnimeEpisode, TMDBSeasonMapping, AnilistMapping } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,21 +55,33 @@ export async function GET(
       );
     }
 
-    // 1. Look up mapping (local, instant)
-    const mapping = getMapping(anilistId);
+    // 1. Try offline mapping first (instant)
+    let mapping: AnilistMapping | null = getMapping(anilistId);
+    let usedAiMapping = false;
+
+    // 2. If not found offline, use AI-powered mapping
     if (!mapping || mapping.tmdbMappings.length === 0) {
-      return NextResponse.json(
-        { success: false, error: `No TMDB mapping found for AniList ID: ${anilistId}` },
-        { status: 404 }
-      );
+      console.log(`[API] No offline mapping for ${anilistId}, trying AI mapping...`);
+      try {
+        mapping = await aiMapAnilistToTmdb(anilistId);
+        usedAiMapping = true;
+        console.log(`[API] AI mapping found for ${anilistId}: TMDB ${mapping.tmdbMappings[0]?.tmdbShowId}`);
+      } catch (aiError) {
+        console.error(`[API] AI mapping failed for ${anilistId}:`, aiError);
+        return NextResponse.json(
+          { success: false, error: `No mapping found for AniList ID: ${anilistId}. AI mapping also failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}` },
+          { status: 404 }
+        );
+      }
     }
 
     const primaryShowId = mapping.tmdbMappings[0].tmdbShowId;
     const seasonNumbers = [...new Set(mapping.tmdbMappings.map(m => m.seasonNumber))];
 
-    // 2. Fetch everything in parallel: AniList (title+poster), TMDB (show+images+seasons)
+    // 3. Fetch everything in parallel: AniList (title+poster), TMDB (show+images+seasons)
+    // Skip AniList fetch if AI mapping already fetched it
     const [anilistInfo, showDetails, imagesResult, ...seasonDataList] = await Promise.all([
-      getAnilistInfo(anilistId).catch(() => null),
+      usedAiMapping ? Promise.resolve(getAnilistInfoFromCache(anilistId)) : getAnilistInfo(anilistId).catch(() => null),
       getShowDetails(primaryShowId).catch(() => null),
       getShowImages(primaryShowId).catch(() => null),
       ...seasonNumbers.map(s => getSeasonEpisodes(primaryShowId, s).catch(() => null)),
@@ -79,7 +92,7 @@ export async function GET(
       if (sd) seasonEpisodesMap.set(seasonNumbers[i], sd);
     });
 
-    // 3. Map episodes using anibridge ranges (local, fast)
+    // 4. Map episodes using ranges
     let allEpisodes: AnimeEpisode[] = [];
     for (const tmdbMapping of mapping.tmdbMappings) {
       const seasonData = seasonEpisodesMap.get(tmdbMapping.seasonNumber);
@@ -96,7 +109,7 @@ export async function GET(
     });
     allEpisodes.sort((a, b) => a.number - b.number);
 
-    // 4. Filter ongoing: only aired
+    // 5. Filter ongoing: only aired
     const airedEpisodes = allEpisodes.filter(ep => ep.hasAired);
     const totalAired = airedEpisodes.length;
 
@@ -108,7 +121,7 @@ export async function GET(
       nextAiringDate = unairedEp.airDate;
     }
 
-    // 5. Build images — Poster from AniList, Banner/Fanart/Clearlogo from TMDB
+    // 6. Build images
     const images: { coverType: 'Banner' | 'Poster' | 'Fanart' | 'Clearlogo'; url: string }[] = [];
 
     // Poster: AniList cover first, fallback TMDB poster
@@ -144,7 +157,7 @@ export async function GET(
       images.push({ coverType: 'Clearlogo', url: getTmdbOriginalUrl(logo.file_path) });
     }
 
-    // 6. Title: AniList English name first, fallback TMDB name
+    // 7. Title: AniList English name first, fallback Romaji, then TMDB
     const title = anilistInfo?.titleEnglish || anilistInfo?.titleRomaji || showDetails?.name || 'Unknown';
     const titleJa = anilistInfo?.titleNative || '';
 
@@ -173,4 +186,10 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+/** Helper to get AniList info from ai-mapping's cache (avoids double fetch) */
+function getAnilistInfoFromCache(anilistId: number) {
+  // ai-mapping already called getAnilistInfo internally, the anilist.ts cache has it
+  return getAnilistInfo(anilistId).catch(() => null);
 }
