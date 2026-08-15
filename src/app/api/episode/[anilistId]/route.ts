@@ -15,7 +15,8 @@ function hasAired(airDate: string | null | undefined): boolean {
 
 function mapEpisodesForSeason(
   tmdbEpisodes: { episode_number: number; name: string; overview?: string; still_path?: string | null; air_date?: string | null; runtime?: number | null }[],
-  mapping: TMDBSeasonMapping
+  mapping: TMDBSeasonMapping,
+  anilistId: number
 ): AnimeEpisode[] {
   const results: AnimeEpisode[] = [];
   for (const ep of tmdbEpisodes) {
@@ -24,7 +25,7 @@ function mapEpisodesForSeason(
     const offset = tmdbNum - mapping.tmdbRange.from;
     const anilistNum = mapping.anilistRange.from + offset;
     results.push({
-      id: `${mapping.anilistId}-${anilistNum}`,
+      id: `${anilistId}-${anilistNum}`,
       number: anilistNum,
       title: ep.name || '',
       description: ep.overview || '',
@@ -97,7 +98,7 @@ export async function GET(
     for (const tmdbMapping of mapping.tmdbMappings) {
       const seasonData = seasonEpisodesMap.get(tmdbMapping.seasonNumber);
       if (!seasonData?.episodes) continue;
-      allEpisodes.push(...mapEpisodesForSeason(seasonData.episodes, tmdbMapping));
+      allEpisodes.push(...mapEpisodesForSeason(seasonData.episodes, tmdbMapping, anilistId));
     }
 
     // Deduplicate & sort

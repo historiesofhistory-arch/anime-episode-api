@@ -57,7 +57,7 @@ export function getCustomMapping(anilistId: number): AnilistMapping | null {
  * AI-powered fallback: AniList ID → TMDB mapping using LLM + TMDB search.
  *
  * Flow:
- * 1. Get anime info from AniList (title, episodes, season, year)
+ * 1. Get anime info from AniList (or LLM + web search if AniList is down)
  * 2. Search TMDB for matching shows
  * 3. Use LLM to pick correct TMDB show and determine season mapping
  * 4. Validate by fetching actual TMDB season data
@@ -68,14 +68,38 @@ export async function aiMapAnilistToTmdb(anilistId: number): Promise<AnilistMapp
   const existing = getCustomMapping(anilistId);
   if (existing) return existing;
 
-  // Step 1: Get AniList info
-  const anilistInfo = await getAnilistInfo(anilistId);
-  const title = anilistInfo.titleEnglish || anilistInfo.titleRomaji || anilistInfo.titleNative || '';
+  // Step 1: Get AniList info (try AniList first, then LLM fallback)
+  let anilistInfo: Awaited<ReturnType<typeof getAnilistInfo>>;
+  let title = '';
+  try {
+    anilistInfo = await getAnilistInfo(anilistId);
+    title = anilistInfo.titleEnglish || anilistInfo.titleRomaji || anilistInfo.titleNative || '';
+  } catch {
+    // AniList might be down — use LLM + web search to identify the anime
+    console.log(`[AI-Mapping] AniList API failed for ${anilistId}, using LLM + web search...`);
+    const ZAI = (await import('z-ai-web-dev-sdk')).default;
+    const zai = await ZAI.create();
+    const wsResults = await zai.functions.invoke('web_search', {
+      query: `anilist ${anilistId}`,
+      num: 5,
+    });
+    // Ask LLM to extract the anime title from search results
+    const identify = await zai.chat.completions.create({
+      messages: [
+        { role: 'assistant', content: 'You identify anime from AniList search results. Return ONLY the anime\'s English title. No quotes, no explanation, just the title.' },
+        { role: 'user', content: `What anime is AniList ID ${anilistId}?\n\nWeb search results:\n${JSON.stringify(wsResults?.slice(0, 5) || [])}` },
+      ],
+      thinking: { type: 'disabled' },
+    });
+    title = (identify.choices?.[0]?.message?.content || '').trim().replace(/^["']|["']$/g, '');
+    console.log(`[AI-Mapping] LLM identified: ${title}`);
+    anilistInfo = { titleEnglish: title || null, titleRomaji: null, titleNative: null, coverImage: null, bannerImage: null };
+  }
   if (!title) throw new Error(`No title found for AniList ID: ${anilistId}`);
 
   // Step 2: Search TMDB
-  const searchResults = await searchShows(title);
-  if (!searchResults.results?.length) {
+  const tmdbSearchResults = await searchShows(title);
+  if (!tmdbSearchResults.results?.length) {
     throw new Error(`No TMDB search results for: ${title}`);
   }
 
@@ -86,7 +110,7 @@ export async function aiMapAnilistToTmdb(anilistId: number): Promise<AnilistMapp
     titleNative: anilistInfo.titleNative,
     coverImage: anilistInfo.coverImage,
     bannerImage: anilistInfo.bannerImage,
-  }, searchResults.results.slice(0, 5));
+  }, tmdbSearchResults.results.slice(0, 5));
 
   const mapping: AnilistMapping = {
     anilistId,
@@ -142,12 +166,13 @@ async function llmDetermineMapping(
 
 Rules:
 - Pick the TMDB show that best matches the anime
-- Many anime have multiple seasons/parts on TMDB (e.g., "Re:Zero - Starting Life in Another World" has Season 1, Season 2 Part 1, Season 2 Part 2 as separate TMDB entries, OR they might be seasons within one show)
+- Many anime have multiple seasons/parts on TMDB (e.g., "Re:Zero" has Season 1, Season 2 Part 1, Season 2 Part 2 as separate TMDB entries, OR they might be seasons within one show)
 - AniList often splits seasons into separate entries (e.g., Re:Zero S2 Part 1 = anilist 108632, Re:Zero S2 Part 2 = anilist 119661)
 - Your job is to figure out which TMDB season(s) correspond to THIS specific AniList entry
 - For single-season shows: direct 1:1 mapping
 - For multi-part shows: identify the correct season/part
 - Some anime have all episodes in one TMDB season, some split across multiple TMDB seasons/shows
+- Pay close attention to season names like "Season 4", "Part 1", "Cour 1", etc.
 
 Respond ONLY with valid JSON array, no markdown, no explanation. Each element must have:
 {"tmdbShowId": number, "seasonNumber": number, "anilistFrom": number, "anilistTo": number, "tmdbFrom": number, "tmdbTo": number}
