@@ -92,10 +92,22 @@ export async function GET(
       );
     }
 
-    // 3.5. Fetch AniList info early — needed for format-based S0 filter
-    const anilistInfo = await getAnilistInfo(anilistId).catch(() => null);
+    // 3.5. Pick primary show (prefer non-S0) for TMDB fetch setup
+    const primaryMapping = mapping.tmdbMappings.find(m => m.seasonNumber > 0) || mapping.tmdbMappings[0];
+    const primaryShowId = primaryMapping.tmdbShowId;
+    const isMovieMapping = primaryMapping.isMovie;
+    // Fetch all unique season numbers (including S0 — filter happens after AniList fetch)
+    const preFilterSeasons = [...new Set(mapping.tmdbMappings.map(m => m.seasonNumber))];
 
-    // Filter out S0 (specials) mappings for TV format — TV entries shouldn't map to specials season
+    // 4. Fetch EVERYTHING in parallel: AniList + TMDB
+    const [anilistInfo, showDetails, imagesResult, ...seasonDataList] = await Promise.all([
+      getAnilistInfo(anilistId).catch(() => null),
+      isMovieMapping ? getMovieDetails(primaryShowId).catch(() => null) : getShowDetails(primaryShowId).catch(() => null),
+      getShowImages(primaryShowId).catch(() => null),
+      ...(isMovieMapping ? [Promise.resolve(null)] : preFilterSeasons.map(s => getSeasonEpisodes(primaryShowId, s).catch(() => null))),
+    ]);
+
+    // 4.5. Now apply S0 filter based on AniList format (TV → skip S0)
     const activeMappings = (anilistInfo?.format === 'TV')
       ? mapping.tmdbMappings.filter(m => m.seasonNumber !== 0)
       : mapping.tmdbMappings;
@@ -108,21 +120,13 @@ export async function GET(
       );
     }
 
-    const primaryShowId = activeMappings[0].tmdbShowId;
-    const isMovieMapping = activeMappings[0].isMovie;
-    const seasonNumbers = [...new Set(activeMappings.map(m => m.seasonNumber))];
-
-    // 4. Fetch TMDB data in parallel (AniList already fetched)
-    const [showDetails, imagesResult, ...seasonDataList] = await Promise.all([
-      isMovieMapping ? getMovieDetails(primaryShowId).catch(() => null) : getShowDetails(primaryShowId).catch(() => null),
-      getShowImages(primaryShowId).catch(() => null),
-      // For movie mappings, don't fetch TV seasons — resolve immediately
-      ...(isMovieMapping ? [Promise.resolve(null)] : seasonNumbers.map(s => getSeasonEpisodes(primaryShowId, s).catch(() => null))),
-    ]);
-
+    // Build season episodes map using pre-fetched data (only for active seasons)
     const seasonEpisodesMap = new Map<number, typeof seasonDataList[0]>();
+    const activeSeasonNumbers = [...new Set(activeMappings.map(m => m.seasonNumber))];
     seasonDataList.forEach((sd, i) => {
-      if (sd) seasonEpisodesMap.set(seasonNumbers[i], sd);
+      if (sd && i < preFilterSeasons.length) {
+        seasonEpisodesMap.set(preFilterSeasons[i], sd);
+      }
     });
 
     // 5. Map episodes using ranges
