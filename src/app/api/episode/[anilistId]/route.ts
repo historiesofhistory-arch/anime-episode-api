@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getMapping } from '@/lib/mappings';
 import { dateBasedMapping } from '@/lib/date-mapping';
-import { aiMapAnilistToTmdb } from '@/lib/ai-mapping';
 import { getShowDetails, getSeasonEpisodes, getShowImages, getTmdbImageUrl, getTmdbOriginalUrl } from '@/lib/tmdb';
 import { getAnilistInfo } from '@/lib/anilist';
 import { EpisodeResponse, AnimeEpisode, TMDBSeasonMapping, AnilistMapping } from '@/lib/types';
@@ -11,7 +10,10 @@ export const dynamic = 'force-dynamic';
 
 function hasAired(airDate: string | null | undefined): boolean {
   if (!airDate) return false;
-  return new Date(airDate) <= new Date();
+  // Compare against UTC midnight to avoid timezone issues
+  const today = new Date();
+  const utcToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59));
+  return new Date(airDate + 'T00:00:00Z') <= utcToday;
 }
 
 function mapEpisodesForSeason(
@@ -82,20 +84,12 @@ export async function GET(
       }
     }
 
-    // 3. If date mapping also failed, try AI mapping as last resort
-    if ((!mapping || mapping.tmdbMappings.length === 0) && !usedFallbackMapping) {
-      console.log(`[API] Date mapping failed for ${anilistId}, trying AI mapping...`);
-      try {
-        mapping = await aiMapAnilistToTmdb(anilistId);
-        usedFallbackMapping = true;
-        console.log(`[API] AI mapping found for ${anilistId}: TMDB ${mapping.tmdbMappings[0]?.tmdbShowId}`);
-      } catch (aiError) {
-        console.error(`[API] AI mapping failed for ${anilistId}:`, aiError);
-        return NextResponse.json(
-          { success: false, error: `No mapping found for AniList ID: ${anilistId}. Date and AI mapping both failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}` },
-          { status: 404 }
-        );
-      }
+    // 3. If date mapping also failed, return 404
+    if (!mapping || mapping.tmdbMappings.length === 0) {
+      return NextResponse.json(
+        { success: false, error: `No mapping found for AniList ID: ${anilistId}` },
+        { status: 404 }
+      );
     }
 
     const primaryShowId = mapping.tmdbMappings[0].tmdbShowId;
