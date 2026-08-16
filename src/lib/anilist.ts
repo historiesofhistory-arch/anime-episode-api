@@ -9,6 +9,9 @@ interface AnilistMediaData {
   titleNative: string | null;
   coverImage: string | null;
   bannerImage: string | null;
+  seasonYear: number | null;
+  format: string | null;
+  relations: { edges: { relationType: string; node: { id: number; title: { english: string | null; romaji: string | null }; format: string | null; seasonYear: number | null } }[] } | null;
 }
 
 const QUERY = `
@@ -24,10 +27,22 @@ query ($id: Int) {
       large
     }
     bannerImage
+    seasonYear
+    format
+    relations {
+      edges {
+        relationType
+        node {
+          id
+          title { english romaji }
+          format
+          seasonYear
+        }
+      }
+    }
   }
 }
 `;
-
 export async function getAnilistInfo(anilistId: number): Promise<AnilistMediaData> {
   const cached = cache.get(String(anilistId));
   if (cached && Date.now() - cached.ts < CACHE_TTL) {
@@ -45,15 +60,18 @@ export async function getAnilistInfo(anilistId: number): Promise<AnilistMediaDat
     throw new Error(`AniList API error: ${res.status}`);
   }
 
-  const json = await res.json() as { data: { Media: { title: { english: string | null; romaji: string | null; native: string | null }; coverImage: { extraLarge: string | null; large: string | null }; bannerImage: string | null } } };
+  const json = await res.json() as any;
   const media = json.data.Media;
 
   const result: AnilistMediaData = {
     titleEnglish: media.title.english,
     titleRomaji: media.title.romaji,
     titleNative: media.title.native,
-    coverImage: media.coverImage.extraLarge || media.coverImage.large,
+    coverImage: media.coverImage?.extraLarge || media.coverImage?.large,
     bannerImage: media.bannerImage,
+    seasonYear: media.seasonYear ?? null,
+    format: media.format ?? null,
+    relations: media.relations ?? null,
   };
 
   cache.set(String(anilistId), { data: result, ts: Date.now() });
