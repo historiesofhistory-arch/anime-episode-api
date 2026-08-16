@@ -121,7 +121,8 @@ async function findRootSeason(startId: number): Promise<{ id: number; startDate:
 // ====== TMDB ======
 
 interface TmdbSearchResult {
-  id: number; name: string; first_air_date?: string; popularity: number;
+  id: number; name: string; first_air_date?: string; release_date?: string; popularity: number;
+  title?: string; // movies use 'title' instead of 'name'
 }
 
 async function tmdbGet<T>(endpoint: string): Promise<T> {
@@ -134,7 +135,12 @@ async function tmdbGet<T>(endpoint: string): Promise<T> {
 
 async function searchTmdb(query: string): Promise<TmdbSearchResult[]> {
  const data = await tmdbGet<any>(`/search/tv?query=${encodeURIComponent(query)}&language=en-US&include_adult=false`);
-  return data.results || [];
+  return (data.results || []).map((r: any) => ({ id: r.id, name: r.name || '', first_air_date: r.first_air_date, popularity: r.popularity }));
+}
+
+async function searchTmdbMovie(query: string): Promise<TmdbSearchResult[]> {
+  const data = await tmdbGet<any>(`/search/movie?query=${encodeURIComponent(query)}&language=en-US&include_adult=false`);
+  return (data.results || []).map((r: any) => ({ id: r.id, name: r.title || '', first_air_date: r.release_date, popularity: r.popularity }));
 }
 
 async function getTmdbAllEpisodes(tmdbId: number): Promise<{ ep: TMDBEpisode; season_number: number }[]> {
@@ -199,6 +205,11 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
     }
   }
 
+  // Step 2.5: Handle MOVIE format differently
+  if (entry.format === 'MOVIE') {
+    return await mapMovie(result, entry);
+  }
+
   // Step 3: Search TMDB
   const tmdbResults = await searchTmdb(result.rootName).catch(e => { result.errors.push(`TMDB search: ${e.message}`); return []; });
   if (!tmdbResults.length) { result.errors.push(`No TMDB results for "${result.rootName}"`); return result; }
@@ -228,8 +239,10 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
   if (!result.startDate) { result.errors.push('No AniList startDate'); return result; }
 
   const firstMatch = allEps.find(e => e.ep.air_date === result.startDate);
+  // For lastMatch: try exact endDate, else fall back to last available episode from startDate
   const lastMatch = result.endDate
-    ? allEps.find(e => e.ep.air_date === result.endDate)
+    ? (allEps.find(e => e.ep.air_date === result.endDate)
+       ?? allEps.filter(e => e.ep.air_date >= result.startDate).pop())
     : allEps.filter(e => e.ep.air_date >= result.startDate).pop();
 
   if (!firstMatch) {
@@ -274,6 +287,56 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
       tmdbRange: { from: epNumbers[0], to: epNumbers[epNumbers.length - 1] },
     });
     anilistFrom += epNumbers.length;
+  }
+
+  return result;
+}
+
+// ====== Movie Handler ======
+
+async function mapMovie(result: DateMappingResult, entry: AnilistMedia): Promise<DateMappingResult> {
+  const movieTitle = entry.title.english || entry.title.romaji || '';
+  if (!movieTitle) { result.errors.push('No title for movie'); return result; }
+
+  const movieResults = await searchTmdbMovie(movieTitle).catch(e => { result.errors.push(`TMDB movie search: ${e.message}`); return []; });
+  if (!movieResults.length) { result.errors.push(`No TMDB movie results for "${movieTitle}"`); return result; }
+
+  // Pick best match: date match first, else popularity
+  let matched = movieResults[0];
+  let verified = false;
+  for (const r of movieResults.slice(0, 5)) {
+    const relDate = r.first_air_date?.substring(0, 10) || '';
+    if (relDate && relDate === result.startDate) {
+      matched = r;
+      verified = true;
+      break;
+    }
+  }
+
+  result.tmdbShow = { id: matched.id, name: matched.name, verified };
+
+  // Fetch movie details for images
+  try {
+    const movieDetails: any = await tmdbGet<any>(`/movie/${matched.id}`);
+    // Build a single "episode" from the movie itself
+    const movieEp: TMDBEpisode = {
+      id: movieDetails.id,
+      episode_number: 1,
+      name: matched.name,
+      overview: movieDetails.overview || '',
+      still_path: movieDetails.poster_path || null,
+      air_date: movieDetails.release_date?.substring(0, 10) || result.startDate,
+      runtime: movieDetails.runtime || null,
+    };
+    result.episodes = [{ ep: movieEp, season: 1 }];
+    result.mappings = [{
+      tmdbShowId: matched.id,
+      seasonNumber: 1,
+      anilistRange: { from: 1, to: 1 },
+      tmdbRange: { from: 1, to: 1 },
+    }];
+  } catch (e: any) {
+    result.errors.push(`TMDB movie details: ${e.message}`);
   }
 
   return result;

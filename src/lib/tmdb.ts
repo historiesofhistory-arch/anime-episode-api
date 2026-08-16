@@ -68,15 +68,30 @@ export async function searchShows(query: string, year?: number): Promise<TMDBSea
 }
 
 export async function getShowDetails(tmdbId: number): Promise<TMDBShow> {
-  return tmdbFetch<TMDBShow>(`/tv/${tmdbId}`);
+  try {
+    return await tmdbFetch<TMDBShow>(`/tv/${tmdbId}`);
+  } catch {
+    // Fallback: might be a movie ID
+    return tmdbFetch<TMDBShow>(`/movie/${tmdbId}`);
+  }
 }
 
 export async function getSeasonEpisodes(tmdbId: number, seasonNumber: number): Promise<TMDBSeason> {
-  return tmdbFetch<TMDBSeason>(`/tv/${tmdbId}/season/${seasonNumber}`);
+  try {
+    return await tmdbFetch<TMDBSeason>(`/tv/${tmdbId}/season/${seasonNumber}`);
+  } catch {
+    // Movie: no seasons, return empty
+    return { id: tmdbId, season_number: seasonNumber, name: '', episodes: [] };
+  }
 }
 
 export async function getShowImages(tmdbId: number): Promise<TMDBImages> {
-  return tmdbFetch<TMDBImages>(`/tv/${tmdbId}/images`);
+  try {
+    return await tmdbFetch<TMDBImages>(`/tv/${tmdbId}/images`);
+  } catch {
+    // Fallback: might be a movie ID
+    return tmdbFetch<TMDBImages>(`/movie/${tmdbId}/images`);
+  }
 }
 
 /**

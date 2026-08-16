@@ -112,7 +112,25 @@ export async function GET(
     let allEpisodes: AnimeEpisode[] = [];
     for (const tmdbMapping of mapping.tmdbMappings) {
       const seasonData = seasonEpisodesMap.get(tmdbMapping.seasonNumber);
-      if (!seasonData?.episodes) continue;
+      if (!seasonData?.episodes?.length) {
+        // Movie or failed fetch: create synthetic episode from mapping
+        if (tmdbMapping.tmdbRange.from === 1 && tmdbMapping.tmdbRange.to === 1) {
+          allEpisodes.push({
+            id: `${anilistId}-1`,
+            number: 1,
+            title: anilistInfo?.titleEnglish || showDetails?.name || 'Movie',
+            description: '',
+            image: anilistInfo?.coverImage || '',
+            airDate: '',
+            duration: showDetails?.runtime || 90,  // TMDB movie has runtime field
+            isFiller: false,
+            titleJa: anilistInfo?.titleNative || '',
+            rating: '0',
+            hasAired: true, // movies are already released
+          });
+        }
+        continue;
+      }
       allEpisodes.push(...mapEpisodesForSeason(seasonData.episodes, tmdbMapping, anilistId));
     }
 
