@@ -12,12 +12,13 @@
  */
 
 import { AnilistMapping, TMDBSeasonMapping, TMDBEpisode } from './types';
+import { fetchMalForBfs } from './mal';
 
 const ANILIST_API = 'https://graphql.anilist.co';
 const TMDB_KEY = process.env.TMDB_API_KEY || '';
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 
-// ====== AniList ======
+// ====== AniList (FALLBACK only — used when MAL ID unavailable) ======
 
 interface AnilistMedia {
   id: number;
@@ -27,25 +28,18 @@ interface AnilistMedia {
   episodes: number | null;
   startDate: { year: number | null; month: number | null; day: number | null } | null;
   endDate: { year: number | null; month: number | null; day: number | null } | null;
-  relations: { edges: { relationType: string; node: { id: number; format: string | null } }[] } | null;
 }
 
 const ANILIST_QUERY = `
 query ($id: Int) {
   Media(id: $id, type: ANIME) {
-    id
+    id idMal
     title { english romaji native }
     format
     seasonYear
     episodes
     startDate { year month day }
     endDate { year month day }
-    relations {
-      edges {
-        relationType
-        node { id format }
-      }
-    }
   }
 }
 `;
@@ -61,7 +55,7 @@ async function fetchAnilist(id: number): Promise<AnilistMedia | null> {
   return json.data?.Media ?? null;
 }
 
-function formatDate(d: { year: number | null; month: number | null; day: number | null } | null): string {
+function formatDateAL(d: { year: number | null; month: number | null; day: number | null } | null): string {
   if (!d || !d.year) return '';
   return `${d.year}-${String(d.month ?? 0).padStart(2, '0')}-${String(d.day ?? 0).padStart(2, '0')}`;
 }
@@ -81,41 +75,36 @@ function hasSeasonOrPart(title: string): boolean {
   return /(?:Season|S)\s*\d+|(?:Part|P|Cour)\s*\d+|\d+(?:st|nd|rd|th)\s*Season/i.test(title);
 }
 
-// ====== BFS: Find Root Season (S1) ======
+// ====== BFS: Find Root Season (S1) via MAL ======
 
-async function findRootSeason(startId: number): Promise<{ id: number; startDate: string; title: string } | null> {
+async function findRootSeason(startMalId: number): Promise<{ id: number; startDate: string; title: string } | null> {
   const visited = new Set<number>();
-  const queue = [startId];
-  let root: AnilistMedia | null = null;
-  const RELEVANT = new Set(['PREQUEL', 'SEQUEL', 'PARENT', 'PARENT_STORY']);
-  const TV = new Set(['TV', 'TV_SHORT']);
+  const queue = [startMalId];
+  let root: { id: number; startDate: string; title: string; seasonYear: number } | null = null;
+  const RELEVANT = new Set(['prequel', 'sequel']);
+  const TV = new Set(['tv', 'tv_short']);
 
   while (queue.length > 0) {
     const id = queue.shift()!;
     if (visited.has(id)) continue;
     visited.add(id);
     try {
-      const m = await fetchAnilist(id);
+      const m = await fetchMalForBfs(id);
       if (!m || !TV.has(m.format || '')) continue;
-      if (!root || (m.seasonYear ?? 9999) < (root.seasonYear ?? 9999) || (m.seasonYear === root.seasonYear && m.id < root.id)) {
-        root = m;
+      const year = parseInt(m.startDate?.substring(0, 4) || '9999', 10);
+      if (!root || year < root.seasonYear || (year === root.seasonYear && m.id < root.id)) {
+        root = { id: m.id, startDate: m.startDate, title: m.title, seasonYear: year };
       }
-      if (m.relations?.edges) {
-        for (const e of m.relations.edges) {
-          if (RELEVANT.has(e.relationType) && TV.has(e.node.format || '') && !visited.has(e.node.id)) {
-            queue.push(e.node.id);
-          }
+      for (const r of m.relations) {
+        if (RELEVANT.has(r.relationType) && TV.has(r.mediaType || '') && !visited.has(r.malId)) {
+          queue.push(r.malId);
         }
       }
     } catch { /* skip failed */ }
   }
 
   if (!root) return null;
-  return {
-    id: root.id,
-    startDate: formatDate(root.startDate),
-    title: root.title.english || root.title.romaji || '',
-  };
+  return { id: root.id, startDate: root.startDate, title: root.title };
 }
 
 // ====== TMDB ======
@@ -183,22 +172,51 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
     mappings: [], episodes: [], errors: [],
   };
 
-  // Step 1: Fetch AniList entry
-  const entry = await fetchAnilist(anilistId).catch(e => { result.errors.push(`AniList: ${e.message}`); return null; });
-  if (!entry) return result;
+  // Step 1: Fetch MAL info (primary) or AniList (fallback) to get title, dates, format, malId
+  let title = '';
+  let format: string | null = null;
+  let malId: number | null = null;
 
-  const title = entry.title.english || entry.title.romaji || '';
+  // Try AniList first just to get idMal (one small call)
+  const alEntry = await fetchAnilist(anilistId).catch(() => null);
+  malId = (alEntry as any)?.idMal ?? null;
+
+  // Get full info from MAL if we have malId
+  let startDate = '';
+  let endDate = '';
+  let episodes: number | null = null;
+  if (malId) {
+    try {
+      const { getMalInfo } = await import('./mal');
+      const malInfo = await getMalInfo(malId);
+      title = malInfo.titleEnglish || malInfo.titleRomaji || '';
+      format = malInfo.format;
+      startDate = malInfo.startDate;
+      endDate = malInfo.endDate;
+      episodes = malInfo.episodes;
+    } catch { /* MAL failed, fall back to AniList data */ }
+  }
+
+  // Fallback: use AniList data if MAL didn't work
+  if (!title && alEntry) {
+    title = alEntry.title.english || alEntry.title.romaji || '';
+    format = alEntry.format;
+    startDate = formatDateAL(alEntry.startDate);
+    endDate = formatDateAL(alEntry.endDate);
+    episodes = alEntry.episodes;
+  }
+
   result.title = title;
   result.rootName = extractRootName(title);
   result.hasSeasonOrPart = hasSeasonOrPart(title);
-  result.startDate = formatDate(entry.startDate);
-  result.endDate = formatDate(entry.endDate);
-  result.anilistEpisodes = entry.episodes;
+  result.startDate = startDate;
+  result.endDate = endDate;
+  result.anilistEpisodes = episodes;
 
-  // Step 2: If season/part, find root S1 via BFS (parallel candidate)
+  // Step 2: If season/part, find root S1 via MAL BFS
   let rootStartDate = result.startDate;
-  if (result.hasSeasonOrPart) {
-    const root = await findRootSeason(anilistId);
+  if (result.hasSeasonOrPart && malId) {
+    const root = await findRootSeason(malId);
     if (root) {
       result.rootS1 = root;
       rootStartDate = root.startDate || result.startDate;
@@ -206,8 +224,8 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
   }
 
   // Step 2.5: Handle MOVIE format (and single-episode formats that map to movies) differently
-  if (entry.format === 'MOVIE' || entry.format === 'SPECIAL' || entry.format === 'TV_SPECIAL') {
-    return await mapMovie(result, entry);
+  if (format === 'MOVIE' || format === 'SPECIAL' || format === 'TV_SPECIAL') {
+    return await mapMovie(result, title);
   }
 
   // Step 3: Search TMDB
@@ -294,8 +312,7 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
 
 // ====== Movie Handler ======
 
-async function mapMovie(result: DateMappingResult, entry: AnilistMedia): Promise<DateMappingResult> {
-  const movieTitle = entry.title.english || entry.title.romaji || '';
+async function mapMovie(result: DateMappingResult, movieTitle: string): Promise<DateMappingResult> {
   if (!movieTitle) { result.errors.push('No title for movie'); return result; }
 
   const movieResults = await searchTmdbMovie(movieTitle).catch(e => { result.errors.push(`TMDB movie search: ${e.message}`); return []; });

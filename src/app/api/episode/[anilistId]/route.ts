@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getMapping } from '@/lib/mappings';
 import { dateBasedMapping } from '@/lib/date-mapping';
 import { getShowDetails, getMovieDetails, getSeasonEpisodes, getShowImages, getTmdbImageUrl, getTmdbOriginalUrl } from '@/lib/tmdb';
+import { getMalInfo } from '@/lib/mal';
 import { getAnilistInfo } from '@/lib/anilist';
 import { EpisodeResponse, AnimeEpisode, TMDBSeasonMapping, AnilistMapping } from '@/lib/types';
 
@@ -10,7 +11,6 @@ export const dynamic = 'force-dynamic';
 
 function hasAired(airDate: string | null | undefined): boolean {
   if (!airDate) return false;
-  // Compare against UTC midnight to avoid timezone issues
   const today = new Date();
   const utcToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59));
   return new Date(airDate + 'T00:00:00Z') <= utcToday;
@@ -96,23 +96,58 @@ export async function GET(
     const primaryMapping = mapping.tmdbMappings.find(m => m.seasonNumber > 0) || mapping.tmdbMappings[0];
     const primaryShowId = primaryMapping.tmdbShowId;
     const isMovieMapping = primaryMapping.isMovie;
-    // Fetch all unique season numbers (including S0 — filter happens after AniList fetch)
     const preFilterSeasons = [...new Set(mapping.tmdbMappings.map(m => m.seasonNumber))];
 
-    // 4. Fetch EVERYTHING in parallel: AniList + TMDB
-    const [anilistInfo, showDetails, imagesResult, ...seasonDataList] = await Promise.all([
-      getAnilistInfo(anilistId).catch(() => null),
+    // 4. Fetch metadata: MAL primary, AniList fallback; TMDB in parallel
+    let metaTitleEnglish: string | null = null;
+    let metaTitleRomaji: string | null = null;
+    let metaTitleNative: string | null = null;
+    let metaCoverImage: string | null = null;
+    let metaBannerImage: string | null = null;
+    let metaFormat: string | null = null;
+    let metaStatus: string | null = null;
+    let metaEpisodes: number | null = null;
+
+    // MAL fetch (primary) — uses mapping.malId from DB
+    const metaPromise = mapping.malId
+      ? getMalInfo(mapping.malId).then(malInfo => {
+          metaTitleEnglish = malInfo.titleEnglish;
+          metaTitleRomaji = malInfo.titleRomaji;
+          metaTitleNative = malInfo.titleNative;
+          metaCoverImage = malInfo.coverImage;
+          metaFormat = malInfo.format;
+          metaStatus = malInfo.status;
+          metaEpisodes = malInfo.episodes;
+        }).catch(() => null)
+      : Promise.resolve(null);
+
+    const [, showDetails, imagesResult, ...seasonDataList] = await Promise.all([
+      metaPromise,
       isMovieMapping ? getMovieDetails(primaryShowId).catch(() => null) : getShowDetails(primaryShowId).catch(() => null),
       getShowImages(primaryShowId).catch(() => null),
       ...(isMovieMapping ? [Promise.resolve(null)] : preFilterSeasons.map(s => getSeasonEpisodes(primaryShowId, s).catch(() => null))),
     ]);
 
-    // 4.5. Now apply S0 filter based on AniList format (TV → skip S0)
-    const activeMappings = (anilistInfo?.format === 'TV')
+    // AniList fallback only if MAL failed or had no malId
+    if (!metaTitleEnglish && !metaTitleRomaji) {
+      try {
+        const alInfo = await getAnilistInfo(anilistId);
+        metaTitleEnglish = metaTitleEnglish || alInfo.titleEnglish;
+        metaTitleRomaji = metaTitleRomaji || alInfo.titleRomaji;
+        metaTitleNative = metaTitleNative || alInfo.titleNative;
+        metaCoverImage = metaCoverImage || alInfo.coverImage;
+        metaBannerImage = alInfo.bannerImage; // only AniList has banner
+        metaFormat = metaFormat || alInfo.format;
+        metaStatus = metaStatus || alInfo.status;
+        metaEpisodes = metaEpisodes ?? alInfo.episodes;
+      } catch { /* AniList also failed, continue with what we have */ }
+    }
+
+    // 4.5. S0 filter: TV format → skip S0
+    const activeMappings = (metaFormat === 'TV')
       ? mapping.tmdbMappings.filter(m => m.seasonNumber !== 0)
       : mapping.tmdbMappings;
 
-    // If all mappings were filtered out, return 404
     if (activeMappings.length === 0) {
       return NextResponse.json(
         { success: false, error: `No mapping found for AniList ID: ${anilistId}` },
@@ -120,32 +155,29 @@ export async function GET(
       );
     }
 
-    // Build season episodes map using pre-fetched data (only for active seasons)
     const seasonEpisodesMap = new Map<number, typeof seasonDataList[0]>();
-    const activeSeasonNumbers = [...new Set(activeMappings.map(m => m.seasonNumber))];
     seasonDataList.forEach((sd, i) => {
       if (sd && i < preFilterSeasons.length) {
         seasonEpisodesMap.set(preFilterSeasons[i], sd);
       }
     });
 
-    // 5. Map episodes using ranges
+    // 5. Map episodes
     let allEpisodes: AnimeEpisode[] = [];
     for (const tmdbMapping of activeMappings) {
       const seasonData = seasonEpisodesMap.get(tmdbMapping.seasonNumber);
       if (!seasonData?.episodes?.length) {
-        // Movie or failed fetch: create synthetic episode from mapping
         if (tmdbMapping.tmdbRange.from === 1 && tmdbMapping.tmdbRange.to === 1) {
           allEpisodes.push({
             id: `${anilistId}-1`,
             number: 1,
-            title: anilistInfo?.titleEnglish || showDetails?.name || 'Movie',
+            title: metaTitleEnglish || showDetails?.name || 'Movie',
             description: (showDetails as any)?.overview || '',
-            image: anilistInfo?.coverImage || '',
+            image: metaCoverImage || '',
             airDate: (showDetails as any)?.release_date?.substring(0, 10) || '',
             duration: (showDetails as any)?.runtime || 90,
             isFiller: false,
-            titleJa: anilistInfo?.titleNative || '',
+            titleJa: metaTitleNative || '',
             rating: '0',
             hasAired: true,
           });
@@ -164,16 +196,16 @@ export async function GET(
     });
     allEpisodes.sort((a, b) => a.number - b.number);
 
-    // 4.5. Ongoing verification: if AniList says more episodes exist, extend from TMDB
-    if (anilistInfo?.status === 'RELEASING' && anilistInfo.episodes && anilistInfo.episodes > allEpisodes.length) {
-      console.log(`[API] Ongoing: AniList has ${anilistInfo.episodes} eps, mapped ${allEpisodes.length}, extending...`);
+    // 4.5. Ongoing extension
+    if (metaStatus === 'RELEASING' && metaEpisodes && metaEpisodes > allEpisodes.length) {
+      console.log(`[API] Ongoing: source has ${metaEpisodes} eps, mapped ${allEpisodes.length}, extending...`);
       const existingSeasons = new Set(activeMappings.map(m => m.seasonNumber));
       try {
         const showInfo = showDetails || await getShowDetails(primaryShowId);
         const allSeasons = (showInfo as any)?.seasons
           ?.filter((s: any) => s.season_number > 0 && !existingSeasons.has(s.season_number))
           .sort((a: any, b: any) => a.season_number - b.season_number) || [];
-        
+
         if (allSeasons.length > 0) {
           const extraSeasonData = await Promise.all(
             allSeasons.map(s => getSeasonEpisodes(primaryShowId, s.season_number).catch(() => null))
@@ -195,7 +227,6 @@ export async function GET(
             alFrom += epNums.length;
             console.log(`[API] Extended S${sNum}: +${epNums.length} eps (TMDB E${epNums[0]}-E${epNums[epNums.length-1]})`);
           }
-          // Re-sort after adding
           allEpisodes.sort((a, b) => a.number - b.number);
         }
       } catch (e) {
@@ -203,7 +234,7 @@ export async function GET(
       }
     }
 
-    // 5. Filter ongoing: only aired
+    // 5. Filter aired only
     const airedEpisodes = allEpisodes.filter(ep => ep.hasAired);
     const totalAired = airedEpisodes.length;
 
@@ -215,34 +246,30 @@ export async function GET(
       nextAiringDate = unairedEp.airDate;
     }
 
-    // 6. Build images
+    // 6. Images
     const images: { coverType: 'Banner' | 'Poster' | 'Fanart' | 'Clearlogo'; url: string }[] = [];
 
-    // Poster: AniList cover first, fallback TMDB poster
-    if (anilistInfo?.coverImage) {
-      images.push({ coverType: 'Poster', url: anilistInfo.coverImage });
+    if (metaCoverImage) {
+      images.push({ coverType: 'Poster', url: metaCoverImage });
     } else if (showDetails?.poster_path) {
       images.push({ coverType: 'Poster', url: getTmdbOriginalUrl(showDetails.poster_path) });
     } else if (imagesResult?.posters?.[0]) {
       images.push({ coverType: 'Poster', url: getTmdbOriginalUrl(imagesResult.posters[0].file_path) });
     }
 
-    // Banner: AniList banner first, fallback TMDB backdrop
-    if (anilistInfo?.bannerImage) {
-      images.push({ coverType: 'Banner', url: anilistInfo.bannerImage });
+    if (metaBannerImage) {
+      images.push({ coverType: 'Banner', url: metaBannerImage });
     } else {
       const backdrop = imagesResult?.backdrops?.[0];
       if (backdrop) images.push({ coverType: 'Banner', url: getTmdbOriginalUrl(backdrop.file_path) });
     }
 
-    // Fanart from TMDB backdrops
-    const fanartIdx = anilistInfo?.bannerImage ? 0 : 1;
+    const fanartIdx = metaBannerImage ? 0 : 1;
     const fanart = imagesResult?.backdrops?.[fanartIdx];
     if (fanart) {
       images.push({ coverType: 'Fanart', url: getTmdbOriginalUrl(fanart.file_path) });
     }
 
-    // Clearlogo from TMDB — English first, then Japanese
     const logo =
       imagesResult?.logos?.find(l => l.iso_639_1 === 'en') ||
       imagesResult?.logos?.find(l => l.iso_639_1 === 'ja') ||
@@ -251,9 +278,9 @@ export async function GET(
       images.push({ coverType: 'Clearlogo', url: getTmdbOriginalUrl(logo.file_path) });
     }
 
-    // 7. Title: AniList English name first, fallback Romaji, then TMDB
-    const title = anilistInfo?.titleEnglish || anilistInfo?.titleRomaji || showDetails?.name || 'Unknown';
-    const titleJa = anilistInfo?.titleNative || '';
+    // 7. Title
+    const title = metaTitleEnglish || metaTitleRomaji || showDetails?.name || 'Unknown';
+    const titleJa = metaTitleNative || '';
 
     const response: EpisodeResponse = {
       success: true,
@@ -267,7 +294,7 @@ export async function GET(
         currentEpisode: totalAired > 0 ? airedEpisodes[totalAired - 1].number : 0,
         nextAiringEpisode,
         nextAiringDate,
-        ongoing: anilistInfo?.status === 'RELEASING',
+        ongoing: metaStatus === 'RELEASING',
         episodes: airedEpisodes,
       },
     };
