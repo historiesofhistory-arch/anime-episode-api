@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://github.com/Fribb/anime-lists",
+    "name": "Fribb/anime-lists: Anime-Mapping Project",
+    "snippet": "Aug 5, 2026 — This means that a Collection should only contain Anime that references each other. This is to prevent Anime that has a relation to another Anime ... Read more",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "Aug 5, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/anime/comments/jshl75/myanimelist_vs_kitsu_which_is_better",
+    "name": "MyAnimeList vs Kitsu: Which is better? : r/anime",
+    "snippet": "Also if there is another anime tracking site you like then that works too of course! :)",
+    "host_name": "www.reddit.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://taiga.moe/api.html",
+    "name": "Comparison of Anime Library APIs",
+    "snippet": "This page aims to draw a comperative picture of AniList , Kitsu and MyAnimeList APIs . 20 results per page for Kitsu , 50 results for MyAnimeList .",
+    "host_name": "taiga.moe",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://lifetips.alibaba.com/tech-efficiency/streamline-anime-watchlists-across-mal-anilist-kitsu",
+    "name": "Streamline Anime Watchlists Across MAL, AniList, Kitsu",
+    "snippet": "Jan 8, 2026 — Export your AniList list as JSON, then run the free, open-source tool ani-sync—it cross - references IDs using the official AniDB mapping database ... Read more",
+    "host_name": "lifetips.alibaba.com",
+    "rank": 3,
+    "date": "Jan 8, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://myanimelist.net/forum/?topicid=2144505",
+    "name": "Access Anime Episode Titles - Forums",
+    "snippet": "Feb 5, 2024 — You can either use jikan or access the episodes from Anilist or Kitsu APIs using the MAL id . Use mapping ID to get the kitsu anime ID . Use  ...",
+    "host_name": "myanimelist.net",
+    "rank": 4,
+    "date": "Feb 5, 2024",
+    "favicon": ""
+  }
+]
