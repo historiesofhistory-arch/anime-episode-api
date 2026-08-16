@@ -341,15 +341,14 @@ Determine the correct TMDB mapping for this AniList entry. Return ONLY a JSON ar
     // Validate: fetch actual TMDB season data to confirm episode ranges
     await validateMappings(mappings);
 
-    // LLM-validated mapping succeeded — persist to disk for future reuse
+    // Cache in memory only — no disk persistence
     const mapping: AnilistMapping = {
       anilistId,
       malId: null,
       tmdbMappings: mappings,
     };
     customMappingsCache.set(anilistId, mapping);
-    saveCustomMappings();
-    console.log(`[AI-Mapping] LLM-validated mapping saved for anilistId=${anilistId}`);
+    console.log(`[AI-Mapping] LLM-validated mapping cached (memory only) for anilistId=${anilistId}`);
 
     return mappings;
   } catch (error) {
