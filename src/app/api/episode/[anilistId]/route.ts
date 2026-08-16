@@ -59,11 +59,23 @@ export async function GET(
       );
     }
 
-    // 1. Try offline mapping first (instant)
-    let mapping: AnilistMapping | null = getMapping(anilistId);
-    let usedFallbackMapping = false;
+    // ============================================================
+    // PHASE 1: AniList + DB (parallel) — get idMal, mapping, banner, nextAiring
+    // ============================================================
+    const anilistPromise = getAnilistInfo(anilistId).catch(() => null);
+    const dbMapping = getMapping(anilistId);
 
-    // 2. If not found offline, try deterministic date-based mapping
+    // Wait for AniList to get reliable idMal
+    const alInfo = await anilistPromise;
+    let idMal: number | null = alInfo?.idMal ?? dbMapping?.malId ?? null;
+    const anilistBannerImage = alInfo?.bannerImage ?? null;
+    const anilistNextAiringEpisode = alInfo?.nextAiringEpisode ?? null;
+
+    // ============================================================
+    // PHASE 2: Mapping resolution (DB → date-based fallback)
+    // ============================================================
+    let mapping: AnilistMapping | null = dbMapping;
+
     if (!mapping || mapping.tmdbMappings.length === 0) {
       console.log(`[API] No offline mapping for ${anilistId}, trying date-based mapping...`);
       try {
@@ -71,10 +83,9 @@ export async function GET(
         if (dateResult.mappings.length > 0) {
           mapping = {
             anilistId,
-            malId: null,
+            malId: idMal,
             tmdbMappings: dateResult.mappings,
           };
-          usedFallbackMapping = true;
           console.log(`[API] Date mapping found for ${anilistId}: TMDB ${mapping.tmdbMappings[0]?.tmdbShowId} (${mapping.tmdbMappings.length} season(s), ${dateResult.episodes.length} eps)`);
         } else {
           console.log(`[API] Date mapping failed for ${anilistId}: ${dateResult.errors.join('; ')}`);
@@ -84,7 +95,6 @@ export async function GET(
       }
     }
 
-    // 3. If date mapping also failed, return 404
     if (!mapping || mapping.tmdbMappings.length === 0) {
       return NextResponse.json(
         { success: false, error: `No mapping found for AniList ID: ${anilistId}` },
@@ -92,58 +102,59 @@ export async function GET(
       );
     }
 
-    // 3.5. Pick primary show (prefer non-S0) for TMDB fetch setup
+    // Use AniList's idMal (most reliable) for response
+    mapping.malId = idMal;
+
+    // ============================================================
+    // PHASE 3: MAL (primary) + TMDB (parallel) — metadata + episodes
+    // ============================================================
     const primaryMapping = mapping.tmdbMappings.find(m => m.seasonNumber > 0) || mapping.tmdbMappings[0];
     const primaryShowId = primaryMapping.tmdbShowId;
     const isMovieMapping = primaryMapping.isMovie;
     const preFilterSeasons = [...new Set(mapping.tmdbMappings.map(m => m.seasonNumber))];
 
-    // 4. Fetch metadata: MAL primary, AniList fallback; TMDB in parallel
+    // MAL PRIMARY + TMDB in parallel
     let metaTitleEnglish: string | null = null;
     let metaTitleRomaji: string | null = null;
     let metaTitleNative: string | null = null;
     let metaCoverImage: string | null = null;
-    let metaBannerImage: string | null = null;
     let metaFormat: string | null = null;
     let metaStatus: string | null = null;
     let metaEpisodes: number | null = null;
+    let malUsed = false;
 
-    // MAL fetch (primary) — uses mapping.malId from DB
-    const metaPromise = mapping.malId
-      ? getMalInfo(mapping.malId).then(malInfo => {
-          metaTitleEnglish = malInfo.titleEnglish;
-          metaTitleRomaji = malInfo.titleRomaji;
-          metaTitleNative = malInfo.titleNative;
-          metaCoverImage = malInfo.coverImage;
-          metaFormat = malInfo.format;
-          metaStatus = malInfo.status;
-          metaEpisodes = malInfo.episodes;
-        }).catch(() => null)
-      : Promise.resolve(null);
-
-    const [, showDetails, imagesResult, ...seasonDataList] = await Promise.all([
-      metaPromise,
+    const [malResult, showDetails, imagesResult, ...seasonDataList] = await Promise.all([
+      idMal
+        ? getMalInfo(idMal).then(malInfo => {
+            metaTitleEnglish = malInfo.titleEnglish;
+            metaTitleRomaji = malInfo.titleRomaji;
+            metaTitleNative = malInfo.titleNative;
+            metaCoverImage = malInfo.coverImage;
+            metaFormat = malInfo.format;
+            metaStatus = malInfo.status;
+            metaEpisodes = malInfo.episodes;
+            malUsed = true;
+          }).catch(() => null)
+        : Promise.resolve(null),
       isMovieMapping ? getMovieDetails(primaryShowId).catch(() => null) : getShowDetails(primaryShowId).catch(() => null),
       getShowImages(primaryShowId).catch(() => null),
       ...(isMovieMapping ? [Promise.resolve(null)] : preFilterSeasons.map(s => getSeasonEpisodes(primaryShowId, s).catch(() => null))),
     ]);
 
-    // AniList fallback only if MAL failed or had no malId
-    if (!metaTitleEnglish && !metaTitleRomaji) {
-      try {
-        const alInfo = await getAnilistInfo(anilistId);
-        metaTitleEnglish = metaTitleEnglish || alInfo.titleEnglish;
-        metaTitleRomaji = metaTitleRomaji || alInfo.titleRomaji;
-        metaTitleNative = metaTitleNative || alInfo.titleNative;
-        metaCoverImage = metaCoverImage || alInfo.coverImage;
-        metaBannerImage = alInfo.bannerImage; // only AniList has banner
-        metaFormat = metaFormat || alInfo.format;
-        metaStatus = metaStatus || alInfo.status;
-        metaEpisodes = metaEpisodes ?? alInfo.episodes;
-      } catch { /* AniList also failed, continue with what we have */ }
+    // AniList FALLBACK: only if MAL completely failed
+    if (!malUsed && alInfo) {
+      metaTitleEnglish = alInfo.titleEnglish;
+      metaTitleRomaji = alInfo.titleRomaji;
+      metaTitleNative = alInfo.titleNative;
+      metaCoverImage = alInfo.coverImage;
+      metaFormat = alInfo.format;
+      metaStatus = alInfo.status;
+      metaEpisodes = alInfo.episodes;
     }
 
-    // 4.5. S0 filter: TV format → skip S0
+    // ============================================================
+    // PHASE 4: S0 filter + episode mapping
+    // ============================================================
     const activeMappings = (metaFormat === 'TV')
       ? mapping.tmdbMappings.filter(m => m.seasonNumber !== 0)
       : mapping.tmdbMappings;
@@ -162,7 +173,6 @@ export async function GET(
       }
     });
 
-    // 5. Map episodes
     let allEpisodes: AnimeEpisode[] = [];
     for (const tmdbMapping of activeMappings) {
       const seasonData = seasonEpisodesMap.get(tmdbMapping.seasonNumber);
@@ -196,7 +206,9 @@ export async function GET(
     });
     allEpisodes.sort((a, b) => a.number - b.number);
 
-    // 4.5. Ongoing extension
+    // ============================================================
+    // PHASE 5: Ongoing extension
+    // ============================================================
     if (metaStatus === 'RELEASING' && metaEpisodes && metaEpisodes > allEpisodes.length) {
       console.log(`[API] Ongoing: source has ${metaEpisodes} eps, mapped ${allEpisodes.length}, extending...`);
       const existingSeasons = new Set(activeMappings.map(m => m.seasonNumber));
@@ -234,19 +246,27 @@ export async function GET(
       }
     }
 
-    // 5. Filter aired only
+    // ============================================================
+    // PHASE 6: Aired filter + next airing + images + response
+    // ============================================================
     const airedEpisodes = allEpisodes.filter(ep => ep.hasAired);
     const totalAired = airedEpisodes.length;
 
     let nextAiringEpisode: number | null = null;
     let nextAiringDate: string | null = null;
-    const unairedEp = allEpisodes.find(ep => !ep.hasAired && ep.airDate);
-    if (unairedEp) {
-      nextAiringEpisode = unairedEp.number;
-      nextAiringDate = unairedEp.airDate;
+
+    if (anilistNextAiringEpisode) {
+      nextAiringEpisode = anilistNextAiringEpisode.episode;
+      nextAiringDate = new Date(anilistNextAiringEpisode.airingAt * 1000).toISOString().substring(0, 10);
+    } else {
+      const unairedEp = allEpisodes.find(ep => !ep.hasAired && ep.airDate);
+      if (unairedEp) {
+        nextAiringEpisode = unairedEp.number;
+        nextAiringDate = unairedEp.airDate;
+      }
     }
 
-    // 6. Images
+    // Images: MAL cover > TMDB poster > TMDB images
     const images: { coverType: 'Banner' | 'Poster' | 'Fanart' | 'Clearlogo'; url: string }[] = [];
 
     if (metaCoverImage) {
@@ -257,14 +277,14 @@ export async function GET(
       images.push({ coverType: 'Poster', url: getTmdbOriginalUrl(imagesResult.posters[0].file_path) });
     }
 
-    if (metaBannerImage) {
-      images.push({ coverType: 'Banner', url: metaBannerImage });
+    if (anilistBannerImage) {
+      images.push({ coverType: 'Banner', url: anilistBannerImage });
     } else {
       const backdrop = imagesResult?.backdrops?.[0];
       if (backdrop) images.push({ coverType: 'Banner', url: getTmdbOriginalUrl(backdrop.file_path) });
     }
 
-    const fanartIdx = metaBannerImage ? 0 : 1;
+    const fanartIdx = anilistBannerImage ? 0 : 1;
     const fanart = imagesResult?.backdrops?.[fanartIdx];
     if (fanart) {
       images.push({ coverType: 'Fanart', url: getTmdbOriginalUrl(fanart.file_path) });
@@ -278,7 +298,6 @@ export async function GET(
       images.push({ coverType: 'Clearlogo', url: getTmdbOriginalUrl(logo.file_path) });
     }
 
-    // 7. Title
     const title = metaTitleEnglish || metaTitleRomaji || showDetails?.name || 'Unknown';
     const titleJa = metaTitleNative || '';
 

@@ -256,12 +256,12 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
   // Step 6: Match by date range
   if (!result.startDate) { result.errors.push('No AniList startDate'); return result; }
 
-  const firstMatch = allEps.find(e => e.ep.air_date === result.startDate);
+  const firstMatch = allEps.find(e => e.ep.air_date != null && e.ep.air_date === result.startDate);
   // For lastMatch: try exact endDate, else fall back to last available episode from startDate
   const lastMatch = result.endDate
-    ? (allEps.find(e => e.ep.air_date === result.endDate)
-       ?? allEps.filter(e => e.ep.air_date >= result.startDate).pop())
-    : allEps.filter(e => e.ep.air_date >= result.startDate).pop();
+    ? (allEps.find(e => e.ep.air_date != null && e.ep.air_date === result.endDate)
+       ?? allEps.filter(e => e.ep.air_date != null && e.ep.air_date >= result.startDate).pop())
+    : allEps.filter(e => e.ep.air_date != null && e.ep.air_date >= result.startDate).pop();
 
   if (!firstMatch) {
     result.errors.push(`No TMDB episode with air_date="${result.startDate}"`);

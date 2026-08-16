@@ -4,6 +4,7 @@ const cache = new Map<string, { data: AnilistMediaData; ts: number }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 interface AnilistMediaData {
+  idMal: number | null;
   titleEnglish: string | null;
   titleRomaji: string | null;
   titleNative: string | null;
@@ -20,6 +21,7 @@ interface AnilistMediaData {
 const QUERY = `
 query ($id: Int) {
   Media(id: $id, type: ANIME) {
+    idMal
     title {
       english
       romaji
@@ -70,6 +72,7 @@ export async function getAnilistInfo(anilistId: number): Promise<AnilistMediaDat
   const media = json.data.Media;
 
   const result: AnilistMediaData = {
+    idMal: media.idMal ?? null,
     titleEnglish: media.title.english,
     titleRomaji: media.title.romaji,
     titleNative: media.title.native,

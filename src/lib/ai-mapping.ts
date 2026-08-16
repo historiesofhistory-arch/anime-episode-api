@@ -155,7 +155,7 @@ export async function aiMapAnilistToTmdb(anilistId: number): Promise<AnilistMapp
 
     // If TMDB search with this title fails, try with just the first few meaningful words
     if (!title) throw new Error(`No title found for AniList ID: ${anilistId}`);
-    anilistInfo = { titleEnglish: title || null, titleRomaji: null, titleNative: null, coverImage: null, bannerImage: null, seasonYear: null, format: null, relations: null };
+    anilistInfo = { idMal: null, titleEnglish: title || null, titleRomaji: null, titleNative: null, coverImage: null, bannerImage: null, seasonYear: null, format: null, status: null, episodes: null, nextAiringEpisode: null, relations: null } as any;
   }
   if (!title) throw new Error(`No title found for AniList ID: ${anilistId}`);
 
