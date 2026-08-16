@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getMapping } from '@/lib/mappings';
+import { dateBasedMapping } from '@/lib/date-mapping';
 import { aiMapAnilistToTmdb } from '@/lib/ai-mapping';
 import { getShowDetails, getSeasonEpisodes, getShowImages, getTmdbImageUrl, getTmdbOriginalUrl } from '@/lib/tmdb';
 import { getAnilistInfo } from '@/lib/anilist';
@@ -58,19 +59,40 @@ export async function GET(
 
     // 1. Try offline mapping first (instant)
     let mapping: AnilistMapping | null = getMapping(anilistId);
-    let usedAiMapping = false;
+    let usedFallbackMapping = false;
 
-    // 2. If not found offline, use AI-powered mapping
+    // 2. If not found offline, try deterministic date-based mapping
     if (!mapping || mapping.tmdbMappings.length === 0) {
-      console.log(`[API] No offline mapping for ${anilistId}, trying AI mapping...`);
+      console.log(`[API] No offline mapping for ${anilistId}, trying date-based mapping...`);
+      try {
+        const dateResult = await dateBasedMapping(anilistId);
+        if (dateResult.mappings.length > 0) {
+          mapping = {
+            anilistId,
+            malId: null,
+            tmdbMappings: dateResult.mappings,
+          };
+          usedFallbackMapping = true;
+          console.log(`[API] Date mapping found for ${anilistId}: TMDB ${mapping.tmdbMappings[0]?.tmdbShowId} (${mapping.tmdbMappings.length} season(s), ${dateResult.episodes.length} eps)`);
+        } else {
+          console.log(`[API] Date mapping failed for ${anilistId}: ${dateResult.errors.join('; ')}`);
+        }
+      } catch (dateError) {
+        console.error(`[API] Date mapping error for ${anilistId}:`, dateError);
+      }
+    }
+
+    // 3. If date mapping also failed, try AI mapping as last resort
+    if ((!mapping || mapping.tmdbMappings.length === 0) && !usedFallbackMapping) {
+      console.log(`[API] Date mapping failed for ${anilistId}, trying AI mapping...`);
       try {
         mapping = await aiMapAnilistToTmdb(anilistId);
-        usedAiMapping = true;
+        usedFallbackMapping = true;
         console.log(`[API] AI mapping found for ${anilistId}: TMDB ${mapping.tmdbMappings[0]?.tmdbShowId}`);
       } catch (aiError) {
         console.error(`[API] AI mapping failed for ${anilistId}:`, aiError);
         return NextResponse.json(
-          { success: false, error: `No mapping found for AniList ID: ${anilistId}. AI mapping also failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}` },
+          { success: false, error: `No mapping found for AniList ID: ${anilistId}. Date and AI mapping both failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}` },
           { status: 404 }
         );
       }
@@ -79,10 +101,9 @@ export async function GET(
     const primaryShowId = mapping.tmdbMappings[0].tmdbShowId;
     const seasonNumbers = [...new Set(mapping.tmdbMappings.map(m => m.seasonNumber))];
 
-    // 3. Fetch everything in parallel: AniList (title+poster), TMDB (show+images+seasons)
-    // Skip AniList fetch if AI mapping already fetched it
+    // 4. Fetch everything in parallel: AniList (title+poster), TMDB (show+images+seasons)
     const [anilistInfo, showDetails, imagesResult, ...seasonDataList] = await Promise.all([
-      usedAiMapping ? Promise.resolve(getAnilistInfoFromCache(anilistId)) : getAnilistInfo(anilistId).catch(() => null),
+      getAnilistInfo(anilistId).catch(() => null),
       getShowDetails(primaryShowId).catch(() => null),
       getShowImages(primaryShowId).catch(() => null),
       ...seasonNumbers.map(s => getSeasonEpisodes(primaryShowId, s).catch(() => null)),
@@ -187,10 +208,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
-
-/** Helper to get AniList info from ai-mapping's cache (avoids double fetch) */
-function getAnilistInfoFromCache(anilistId: number) {
-  // ai-mapping already called getAnilistInfo internally, the anilist.ts cache has it
-  return getAnilistInfo(anilistId).catch(() => null);
 }
