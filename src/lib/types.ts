@@ -31,6 +31,7 @@ export interface EpisodeResponse {
     currentEpisode: number;
     nextAiringEpisode: number | null;
     nextAiringDate: string | null;
+    ongoing: boolean;
     episodes: AnimeEpisode[];
   };
 }

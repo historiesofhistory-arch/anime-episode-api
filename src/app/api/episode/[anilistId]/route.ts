@@ -143,6 +143,45 @@ export async function GET(
     });
     allEpisodes.sort((a, b) => a.number - b.number);
 
+    // 4.5. Ongoing verification: if AniList says more episodes exist, extend from TMDB
+    if (anilistInfo?.status === 'RELEASING' && anilistInfo.episodes && anilistInfo.episodes > allEpisodes.length) {
+      console.log(`[API] Ongoing: AniList has ${anilistInfo.episodes} eps, mapped ${allEpisodes.length}, extending...`);
+      const existingSeasons = new Set(mapping.tmdbMappings.map(m => m.seasonNumber));
+      try {
+        const showInfo = showDetails || await getShowDetails(primaryShowId);
+        const allSeasons = (showInfo as any)?.seasons
+          ?.filter((s: any) => s.season_number > 0 && !existingSeasons.has(s.season_number))
+          .sort((a: any, b: any) => a.season_number - b.season_number) || [];
+        
+        if (allSeasons.length > 0) {
+          const extraSeasonData = await Promise.all(
+            allSeasons.map(s => getSeasonEpisodes(primaryShowId, s.season_number).catch(() => null))
+          );
+          let alFrom = allEpisodes.length + 1;
+          for (let i = 0; i < extraSeasonData.length; i++) {
+            const sd = extraSeasonData[i];
+            const sNum = allSeasons[i].season_number;
+            if (!sd?.episodes?.length) continue;
+            const epNums = sd.episodes.map(e => e.episode_number).sort((a, b) => a - b);
+            const extMapping: TMDBSeasonMapping = {
+              tmdbShowId: primaryShowId,
+              seasonNumber: sNum,
+              anilistRange: { from: alFrom, to: alFrom + epNums.length - 1 },
+              tmdbRange: { from: epNums[0], to: epNums[epNums.length - 1] },
+            };
+            const extraEps = mapEpisodesForSeason(sd.episodes, extMapping, anilistId);
+            allEpisodes.push(...extraEps);
+            alFrom += epNums.length;
+            console.log(`[API] Extended S${sNum}: +${epNums.length} eps (TMDB E${epNums[0]}-E${epNums[epNums.length-1]})`);
+          }
+          // Re-sort after adding
+          allEpisodes.sort((a, b) => a.number - b.number);
+        }
+      } catch (e) {
+        console.error(`[API] Ongoing extension failed:`, e);
+      }
+    }
+
     // 5. Filter ongoing: only aired
     const airedEpisodes = allEpisodes.filter(ep => ep.hasAired);
     const totalAired = airedEpisodes.length;
@@ -207,6 +246,7 @@ export async function GET(
         currentEpisode: totalAired > 0 ? airedEpisodes[totalAired - 1].number : 0,
         nextAiringEpisode,
         nextAiringDate,
+        ongoing: anilistInfo?.status === 'RELEASING',
         episodes: airedEpisodes,
       },
     };

@@ -11,6 +11,9 @@ interface AnilistMediaData {
   bannerImage: string | null;
   seasonYear: number | null;
   format: string | null;
+  status: string | null;
+  episodes: number | null;
+  nextAiringEpisode: { episode: number; airingAt: number } | null;
   relations: { edges: { relationType: string; node: { id: number; title: { english: string | null; romaji: string | null }; format: string | null; seasonYear: number | null } }[] } | null;
 }
 
@@ -29,6 +32,9 @@ query ($id: Int) {
     bannerImage
     seasonYear
     format
+    status
+    episodes
+    nextAiringEpisode { episode airingAt }
     relations {
       edges {
         relationType
@@ -71,6 +77,9 @@ export async function getAnilistInfo(anilistId: number): Promise<AnilistMediaDat
     bannerImage: media.bannerImage,
     seasonYear: media.seasonYear ?? null,
     format: media.format ?? null,
+    status: media.status ?? null,
+    episodes: media.episodes ?? null,
+    nextAiringEpisode: media.nextAiringEpisode ?? null,
     relations: media.relations ?? null,
   };
 
