@@ -205,8 +205,8 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
     }
   }
 
-  // Step 2.5: Handle MOVIE format differently
-  if (entry.format === 'MOVIE') {
+  // Step 2.5: Handle MOVIE format (and single-episode formats that map to movies) differently
+  if (entry.format === 'MOVIE' || entry.format === 'SPECIAL' || entry.format === 'TV_SPECIAL') {
     return await mapMovie(result, entry);
   }
 

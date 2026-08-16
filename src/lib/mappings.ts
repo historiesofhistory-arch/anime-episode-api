@@ -2,9 +2,11 @@ import { AnilistMapping, TMDBSeasonMapping, EpisodeRange } from './types';
 import path from 'path';
 import fs from 'fs';
 
-// Parse a range string like "1-13" into {from, to}
+// Parse a range string like "1-13" or "1" into {from, to}
 function parseRange(rangeStr: string): EpisodeRange {
-  const [from, to] = rangeStr.split('-').map(Number);
+  const parts = rangeStr.split('-').map(Number);
+  const from = parts[0] || 0;
+  const to = parts.length > 1 ? parts[1] : from;
   return { from, to };
 }
 
@@ -51,13 +53,19 @@ function buildReverseIndex(): Map<number, AnilistMapping> {
     if (sourceKey === '$meta') continue;
 
     // Check if the SOURCE KEY itself is a tmdb_show entry
-    const isTmdbSource = sourceKey.startsWith('tmdb_show:');
+    const isTmdbShowSource = sourceKey.startsWith('tmdb_show:');
+    const isTmdbMovieSource = sourceKey.startsWith('tmdb_movie:');
+    const isTmdbSource = isTmdbShowSource || isTmdbMovieSource;
     let sourceTmdbShowId = 0;
-    let sourceTmdbSeason = 0;
-    if (isTmdbSource) {
+    let sourceTmdbSeason = 1;
+    if (isTmdbShowSource) {
       const parts = sourceKey.split(':');
       sourceTmdbShowId = parseInt(parts[1], 10);
       sourceTmdbSeason = parseInt(parts[2].replace('s', ''), 10);
+    } else if (isTmdbMovieSource) {
+      const parts = sourceKey.split(':');
+      sourceTmdbShowId = parseInt(parts[1], 10);
+      sourceTmdbSeason = 1; // movies are treated as season 1
     }
 
     for (const [serviceKey, ranges] of Object.entries(entry)) {
@@ -85,6 +93,7 @@ function buildReverseIndex(): Map<number, AnilistMapping> {
                 seasonNumber: sourceTmdbSeason,
                 anilistRange: parseRange(anilistRangeStr as string),
                 tmdbRange: parseRange(tmdbRangeStr as string),
+                isMovie: isTmdbMovieSource,
               });
             }
           } else if (!sourceKey.startsWith('tvdb_show:')) {
@@ -93,17 +102,19 @@ function buildReverseIndex(): Map<number, AnilistMapping> {
             // in the same entry, so we skip them here. The tmdb_show SOURCE keys (CASE 2)
             // handle those mappings correctly.
             for (const [sk, sr] of Object.entries(entry)) {
-              if (sk.startsWith('tmdb_show:') && sr && typeof sr === 'object') {
+              if ((sk.startsWith('tmdb_show:') || sk.startsWith('tmdb_movie:')) && sr && typeof sr === 'object') {
                 const parts = sk.split(':');
                 const tmdbShowId = parseInt(parts[1], 10);
-                const seasonNumber = parseInt(parts[2].replace('s', ''), 10);
+                const seasonNumber = sk.startsWith('tmdb_movie:') ? 1 : parseInt(parts[2].replace('s', ''), 10);
 
+                const isMovie = sk.startsWith('tmdb_movie:');
                 for (const [anilistRangeStr, tmdbRangeStr] of Object.entries(sr as Record<string, string>)) {
                   tmdbMappings.push({
                     tmdbShowId,
                     seasonNumber,
                     anilistRange: parseRange(anilistRangeStr),
                     tmdbRange: parseRange(tmdbRangeStr),
+                    isMovie,
                   });
                 }
               }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getMapping } from '@/lib/mappings';
 import { dateBasedMapping } from '@/lib/date-mapping';
-import { getShowDetails, getSeasonEpisodes, getShowImages, getTmdbImageUrl, getTmdbOriginalUrl } from '@/lib/tmdb';
+import { getShowDetails, getMovieDetails, getSeasonEpisodes, getShowImages, getTmdbImageUrl, getTmdbOriginalUrl } from '@/lib/tmdb';
 import { getAnilistInfo } from '@/lib/anilist';
 import { EpisodeResponse, AnimeEpisode, TMDBSeasonMapping, AnilistMapping } from '@/lib/types';
 
@@ -93,14 +93,16 @@ export async function GET(
     }
 
     const primaryShowId = mapping.tmdbMappings[0].tmdbShowId;
+    const isMovieMapping = mapping.tmdbMappings[0].isMovie;
     const seasonNumbers = [...new Set(mapping.tmdbMappings.map(m => m.seasonNumber))];
 
     // 4. Fetch everything in parallel: AniList (title+poster), TMDB (show+images+seasons)
     const [anilistInfo, showDetails, imagesResult, ...seasonDataList] = await Promise.all([
       getAnilistInfo(anilistId).catch(() => null),
-      getShowDetails(primaryShowId).catch(() => null),
+      isMovieMapping ? getMovieDetails(primaryShowId).catch(() => null) : getShowDetails(primaryShowId).catch(() => null),
       getShowImages(primaryShowId).catch(() => null),
-      ...seasonNumbers.map(s => getSeasonEpisodes(primaryShowId, s).catch(() => null)),
+      // For movie mappings, don't fetch TV seasons — resolve immediately
+      ...(isMovieMapping ? [Promise.resolve(null)] : seasonNumbers.map(s => getSeasonEpisodes(primaryShowId, s).catch(() => null))),
     ]);
 
     const seasonEpisodesMap = new Map<number, typeof seasonDataList[0]>();
@@ -119,14 +121,14 @@ export async function GET(
             id: `${anilistId}-1`,
             number: 1,
             title: anilistInfo?.titleEnglish || showDetails?.name || 'Movie',
-            description: '',
+            description: (showDetails as any)?.overview || '',
             image: anilistInfo?.coverImage || '',
-            airDate: '',
-            duration: showDetails?.runtime || 90,  // TMDB movie has runtime field
+            airDate: (showDetails as any)?.release_date?.substring(0, 10) || '',
+            duration: (showDetails as any)?.runtime || 90,
             isFiller: false,
             titleJa: anilistInfo?.titleNative || '',
             rating: '0',
-            hasAired: true, // movies are already released
+            hasAired: true,
           });
         }
         continue;

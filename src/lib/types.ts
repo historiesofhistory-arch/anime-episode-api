@@ -106,6 +106,7 @@ export interface TMDBSeasonMapping {
   seasonNumber: number;
   anilistRange: EpisodeRange;  // AniList episode range
   tmdbRange: EpisodeRange;     // Corresponding TMDB episode range
+  isMovie?: boolean;           // true if tmdbShowId is a movie, not a TV show
 }
 
 export interface AnilistMapping {

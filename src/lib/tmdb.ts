@@ -76,6 +76,15 @@ export async function getShowDetails(tmdbId: number): Promise<TMDBShow> {
   }
 }
 
+export async function getMovieDetails(tmdbId: number): Promise<TMDBShow> {
+  try {
+    return await tmdbFetch<TMDBShow>(`/movie/${tmdbId}`);
+  } catch {
+    // Fallback: might be a TV show ID
+    return tmdbFetch<TMDBShow>(`/tv/${tmdbId}`);
+  }
+}
+
 export async function getSeasonEpisodes(tmdbId: number, seasonNumber: number): Promise<TMDBSeason> {
   try {
     return await tmdbFetch<TMDBSeason>(`/tv/${tmdbId}/season/${seasonNumber}`);
