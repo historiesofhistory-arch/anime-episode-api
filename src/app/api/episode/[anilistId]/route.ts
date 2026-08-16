@@ -92,13 +92,28 @@ export async function GET(
       );
     }
 
-    const primaryShowId = mapping.tmdbMappings[0].tmdbShowId;
-    const isMovieMapping = mapping.tmdbMappings[0].isMovie;
-    const seasonNumbers = [...new Set(mapping.tmdbMappings.map(m => m.seasonNumber))];
+    // 3.5. Fetch AniList info early — needed for format-based S0 filter
+    const anilistInfo = await getAnilistInfo(anilistId).catch(() => null);
 
-    // 4. Fetch everything in parallel: AniList (title+poster), TMDB (show+images+seasons)
-    const [anilistInfo, showDetails, imagesResult, ...seasonDataList] = await Promise.all([
-      getAnilistInfo(anilistId).catch(() => null),
+    // Filter out S0 (specials) mappings for TV format — TV entries shouldn't map to specials season
+    const activeMappings = (anilistInfo?.format === 'TV')
+      ? mapping.tmdbMappings.filter(m => m.seasonNumber !== 0)
+      : mapping.tmdbMappings;
+
+    // If all mappings were filtered out, return 404
+    if (activeMappings.length === 0) {
+      return NextResponse.json(
+        { success: false, error: `No mapping found for AniList ID: ${anilistId}` },
+        { status: 404 }
+      );
+    }
+
+    const primaryShowId = activeMappings[0].tmdbShowId;
+    const isMovieMapping = activeMappings[0].isMovie;
+    const seasonNumbers = [...new Set(activeMappings.map(m => m.seasonNumber))];
+
+    // 4. Fetch TMDB data in parallel (AniList already fetched)
+    const [showDetails, imagesResult, ...seasonDataList] = await Promise.all([
       isMovieMapping ? getMovieDetails(primaryShowId).catch(() => null) : getShowDetails(primaryShowId).catch(() => null),
       getShowImages(primaryShowId).catch(() => null),
       // For movie mappings, don't fetch TV seasons — resolve immediately
@@ -110,9 +125,9 @@ export async function GET(
       if (sd) seasonEpisodesMap.set(seasonNumbers[i], sd);
     });
 
-    // 4. Map episodes using ranges
+    // 5. Map episodes using ranges
     let allEpisodes: AnimeEpisode[] = [];
-    for (const tmdbMapping of mapping.tmdbMappings) {
+    for (const tmdbMapping of activeMappings) {
       const seasonData = seasonEpisodesMap.get(tmdbMapping.seasonNumber);
       if (!seasonData?.episodes?.length) {
         // Movie or failed fetch: create synthetic episode from mapping
@@ -148,7 +163,7 @@ export async function GET(
     // 4.5. Ongoing verification: if AniList says more episodes exist, extend from TMDB
     if (anilistInfo?.status === 'RELEASING' && anilistInfo.episodes && anilistInfo.episodes > allEpisodes.length) {
       console.log(`[API] Ongoing: AniList has ${anilistInfo.episodes} eps, mapped ${allEpisodes.length}, extending...`);
-      const existingSeasons = new Set(mapping.tmdbMappings.map(m => m.seasonNumber));
+      const existingSeasons = new Set(activeMappings.map(m => m.seasonNumber));
       try {
         const showInfo = showDetails || await getShowDetails(primaryShowId);
         const allSeasons = (showInfo as any)?.seasons
