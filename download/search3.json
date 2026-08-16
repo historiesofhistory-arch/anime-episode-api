@@ -1,0 +1,83 @@
+[
+  {
+    "url": "https://github.com/SuperMarcus/myanimelist-api-specification/blob/master/README.md",
+    "name": "myanimelist-api-specification/README.md at master",
+    "snippet": "An unofficial API specification for MyAnimeList . Contribute to SuperMarcus/ myanimelist - api -specification development by creating an account on GitHub.",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/csharp/comments/rk0ls8/how_to_use_myanimelists_api_in_dotnet_6",
+    "name": "how to use MyAnimeList's API in dotnet 6 : r/csharp",
+    "snippet": "You'll need: The MyAnimeList API documentation: https://myanimelist.net/apiconfig/references/api/v2. A way to read a rest API. Read more",
+    "host_name": "www.reddit.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://myanimelist.net/apiconfig/references/api/v2",
+    "name": "MyAnimeList API (beta ver.) (2)",
+    "snippet": "There are multiple versions of the API . The returned anime contains the ranking field. Add specified anime to my anime list .",
+    "host_name": "myanimelist.net",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://classic.yarnpkg.com/en/package/mal-api-v2",
+    "name": "mal-api-v2",
+    "snippet": "This documentation covers Yarn 1 (Classic). An awesome library to connect with the new MyAnimeList's API v2 ! anime , manga, mal - api . This is the official  ...",
+    "host_name": "classic.yarnpkg.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=fH4dTrdSoAo",
+    "name": "Building a React.js Website | MyAnimeList API",
+    "snippet": "How build a website in React.js and use an API. Build An Anime Website (API Project) Build an ANIME Search Database in React JS ~ Jikan Anime ...",
+    "host_name": "www.youtube.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://dlthub.com/context/source/myanimelist",
+    "name": "MyAnimeList Python API Docs",
+    "snippet": "Jun 6, 2026 — MyAnimeList is a platform that provides a REST API to access anime and manga databases, user lists, and ranking information",
+    "host_name": "dlthub.com",
+    "rank": 5,
+    "date": "Jun 6, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://apify.com/canadesk/myanimelist/api",
+    "name": "MyAnimeList API",
+    "snippet": "MyAnimeList API . Below, you can find a list of relevant HTTP API endpoints for calling the MyAnimeList Actor. For this, you'll need an Apify account. Read more",
+    "host_name": "apify.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://malpy.readthedocs.io",
+    "name": "Welcome to mal.py's documentation! — mal.py 0.10.1",
+    "snippet": "Welcome to mal.py's documentation!  . mal.py is an API wrapper for MyAnimeList.net written in Python. Features: anime and manga search given a keyword. Read more",
+    "host_name": "malpy.readthedocs.io",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://apis.io/providers/myanimelist",
+    "name": "MyAnimeList — API Provider, Schemas",
+    "snippet": "MyAnimeList publishes 1 API on the APIs.io network . Tagged areas include Anime and Public APIs. Visit website Source on GitHub. Read more",
+    "host_name": "apis.io",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  }
+]

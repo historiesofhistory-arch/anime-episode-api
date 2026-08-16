@@ -1,0 +1,83 @@
+[
+  {
+    "url": "https://www.reddit.com/r/PleX/comments/doz4x6/using_thetvdb_instead_of_anidb_for_my_anime",
+    "name": "Using TheTVDB instead of AniDB for my anime library",
+    "snippet": "Sonarr and Radarr substitute aggregating new media and PlexAniSync can substitute synchronizing. For movies I just map them to the ...",
+    "host_name": "www.reddit.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/ZeroQI/Hama.bundle/issues/457",
+    "name": "TheTVDB v4 licensing and HAMA future · Issue #457",
+    "snippet": "Mar 23, 2021 — Thoughts on the possible options of formats of enhancing ' anime -lists' to have it have both TVDB & TMDB mapping data? Its all the same ... Read more",
+    "host_name": "github.com",
+    "rank": 1,
+    "date": "Mar 23, 2021",
+    "favicon": ""
+  },
+  {
+    "url": "https://anilist.co/forum/thread/87211",
+    "name": "A privacy-focused media tracker with AniList sync",
+    "snippet": "Jan 19, 2026 — dedicated media tracker built using the TMDB API that syncs with AniList and others to keep your anime library in sync while you manage Western ...",
+    "host_name": "anilist.co",
+    "rank": 2,
+    "date": "Jan 19, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://addons.mozilla.org/en-US/firefox/addon/mal-sync",
+    "name": "MAL-Sync – Get this Extension for Firefox (en-US)",
+    "snippet": "Jul 15, 2026 — This extension syncs with your favorite anime databases: MyAnimeList, AniList , Kitsu, Simkl — and integrates them into your favorite streaming ... Read more",
+    "host_name": "addons.mozilla.org",
+    "rank": 3,
+    "date": "Jul 15, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://forums.sonarr.tv/t/sync-your-myanimelist-to-sonarr/33236",
+    "name": "Sync your MyAnimeList to Sonarr - Third Party Addons",
+    "snippet": "Jan 15, 2024 — OAUTH to MyAnimeList · Sync items from your list marked as “Watching” · Add said items to your Sonarr and begin searching for them immediately. Read more",
+    "host_name": "forums.sonarr.tv",
+    "rank": 4,
+    "date": "Jan 15, 2024",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/MALSync/MALSync",
+    "name": "MAL-Sync",
+    "snippet": "MAL-Sync is a powerful extension and userscript, which enables automatic episode tracking between MyAnimeList/Anilist/Kitsu/Simkl/Shikimori/MangaBaka and ... Read more",
+    "host_name": "github.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.scribd.com/document/749786146/Plex-Guide-for-Anime",
+    "name": "Plex Anime Server Setup Guide | PDF",
+    "snippet": "Plex AniSync is designed to automate the synchronization of anime viewing data between Plex and services like AniList. It functions as a Python script running ...",
+    "host_name": "www.scribd.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://malsync.moe",
+    "name": "MyAnimeList Sync",
+    "snippet": "Track anime and manga as you go on a large selection of pages. FEATURE 1. Search, update and manage your list from everywhere with the ... Read more",
+    "host_name": "malsync.moe",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.resetera.com/threads/plex-and-anime-is-just-bad-anyone-got-any-fixes.1008294",
+    "name": "Plex and anime is just bad. Anyone got any fixes?",
+    "snippet": "Oct 12, 2024 — I have a huge anime library, and I want to sync everything with Plex. However, I've noticed that Plex is really bad about correctly tagging and ... Read more",
+    "host_name": "www.resetera.com",
+    "rank": 8,
+    "date": "Oct 12, 2024",
+    "favicon": ""
+  }
+]

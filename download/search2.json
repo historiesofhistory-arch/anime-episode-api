@@ -1,0 +1,83 @@
+[
+  {
+    "url": "https://forums.learnnatively.com/t/suggestion-to-switch-from-tmdb-to-an-other-data-base-like-thetvdb-for-better-anime-season-handling/17575",
+    "name": "Suggestion to Switch from TMDb to an other data base like",
+    "snippet": "Jul 17, 2025 — Hello everyone, I've run into issues with the current database ( TheMovieDB / TMDb ) not respecting anime season structures.",
+    "host_name": "forums.learnnatively.com",
+    "rank": 0,
+    "date": "Jul 17, 2025",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/Serializd/comments/1qjvkbh/why_are_my_animes_structured_as_1_season",
+    "name": "Why are my animes structured as 1 season? : r/Serializd",
+    "snippet": "For anime, use Anilist ... Episodes airing in a split cour format (e.g. Episodes 1-13, break, Episodes 14-26) are added in a single season. Read more",
+    "host_name": "www.reddit.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/eliasbenb/PlexAniBridge-Mappings",
+    "name": "eliasbenb/PlexAniBridge-Mappings",
+    "snippet": "Apr 5, 2026 — Detailed TVDB Mapping : Supports complex TVDB season and episode mappings , including split episode ranges, ratios, and offsets. Problem Reporting ... Read more",
+    "host_name": "github.com",
+    "rank": 2,
+    "date": "Apr 5, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.themoviedb.org/talk/6996a5a14fbedd07461b0bdb",
+    "name": "Can we please change the anime rules for seasons and",
+    "snippet": "Feb 18, 2026 — The problem isn't just individual entries — it seems to come from inconsistent or overly rigid rules, anime production blocks don't map cleanly ...",
+    "host_name": "www.themoviedb.org",
+    "rank": 3,
+    "date": "Feb 18, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://forums.trakt.tv/t/tmdb-anime-series/48457",
+    "name": "TMDB Anime Series - Questions & Help",
+    "snippet": "Mar 1, 2025 — + 1 . It's a pain to navigate animes like Re:Zero already as it's impossible to find where one season starts and one season ends. Read more",
+    "host_name": "forums.trakt.tv",
+    "rank": 4,
+    "date": "Mar 1, 2025",
+    "favicon": ""
+  },
+  {
+    "url": "https://anilist.co/forum/thread/28042",
+    "name": "Forum Thread: I really love this site, but there are",
+    "snippet": "Mar 23, 2021 — The purpose of this site is to track/rate anime /manga you have watched. anime has a new season . Here comes the problem there are no entries for ...",
+    "host_name": "anilist.co",
+    "rank": 5,
+    "date": "Mar 23, 2021",
+    "favicon": ""
+  },
+  {
+    "url": "https://simkl.uservoice.com/forums/264009-top-ideas-from-the-community/suggestions/31779133-merge-anime-seasons-into-one-show",
+    "name": "Merge anime seasons into one show",
+    "snippet": "Having each season as a separate entry makes long-running anime difficult to manage. Users have to search for and add every new season manually, which",
+    "host_name": "simkl.uservoice.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/zoriya/Kyoo/issues/352",
+    "name": "Sync watchlist with MyAnimelist and AniList · Issue #352",
+    "snippet": "Mar 23, 2024 — The only issue with this list is that it's based around tvdb mapping , Search on AniList and TMDB and pick best match out of the two. Use thexem ...",
+    "host_name": "github.com",
+    "rank": 7,
+    "date": "Mar 23, 2024",
+    "favicon": ""
+  },
+  {
+    "url": "https://community.firecore.com/t/tmdb-anime-seasons-and-episode-groups/34693",
+    "name": "TMDB anime seasons and episode groups - Suggestions",
+    "snippet": "Oct 12, 2021 — Since many Anime don't really have seasons they get put in a single season on TMDB . Problem is that they should normally be sorted in Arcs ...",
+    "host_name": "community.firecore.com",
+    "rank": 8,
+    "date": "Oct 12, 2021",
+    "favicon": ""
+  }
+]

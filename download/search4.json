@@ -1,0 +1,83 @@
+[
+  {
+    "url": "https://forums.learnnatively.com/t/suggestion-to-switch-from-tmdb-to-an-other-data-base-like-thetvdb-for-better-anime-season-handling/17575",
+    "name": "Suggestion to Switch from TMDb to an other data base like",
+    "snippet": "Jul 17, 2025 — Hello everyone, I've run into issues with the current database (TheMovieDB/TMDb) not respecting anime season structures.",
+    "host_name": "forums.learnnatively.com",
+    "rank": 0,
+    "date": "Jul 17, 2025",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.filebot.net/forums/viewtopic.php?t=14993",
+    "name": "FileBot not finding a show actually on TMDB/AniDB",
+    "snippet": "Jan 28, 2026 — And sometimes, especially when it involves Specials / OVA's , TMDB doesn't even recognize it at all, and I have to use AniDB/ TMDB to properly ...",
+    "host_name": "www.filebot.net",
+    "rank": 1,
+    "date": "Jan 28, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.themoviedb.org/talk/6996a5a14fbedd07461b0bdb",
+    "name": "Can we please change the anime rules for seasons and",
+    "snippet": "Feb 18, 2026 — the main issue wasn't just OVAs , it was the broader inconsistency absolute numbering , and how anime production blocks don't map cleanly to TMDB ...",
+    "host_name": "www.themoviedb.org",
+    "rank": 2,
+    "date": "Feb 18, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/PleX/comments/1bws19m/guys_how_you_all_are_naming_anime_and_stuff",
+    "name": "Guys how you all are naming anime and stuff (specially",
+    "snippet": "OVAs , ONAs, special plex doesn't recognize. If some episodes recognize then name incorrectly or incorrect episode name. TMDB /TVDB to see if the ...",
+    "host_name": "www.reddit.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/zoriya/Kyoo/issues/352",
+    "name": "Sync watchlist with MyAnimelist and AniList · Issue #352",
+    "snippet": "Mar 23, 2024 — Search on AniList and TMDB and pick best match out of the two. Use thexem to find season - number and parent show If thexem lookup failed, walk ...",
+    "host_name": "github.com",
+    "rank": 4,
+    "date": "Mar 23, 2024",
+    "favicon": ""
+  },
+  {
+    "url": "https://forums.trakt.tv/t/lets-talk-about-tmdb/14040",
+    "name": "Let's talk about TMDB - General",
+    "snippet": "Jan 16, 2023 — For some time now, I have been reporting problems with the TMDB database, specifically with anime series . I have also done so on TMDB's own page ... Read more",
+    "host_name": "forums.trakt.tv",
+    "rank": 5,
+    "date": "Jan 16, 2023",
+    "favicon": ""
+  },
+  {
+    "url": "https://wiki.crosswatch.app/crosswatch/settings/connections/metadata/anime-id-mapping",
+    "name": "Anime ID Mapping | WIKI - CrossWatch(CW)",
+    "snippet": "Anime ID Mapping helps CrossWatch match anime across services with different IDs and episode numbering. It can also translate episode numbering when providers ...",
+    "host_name": "wiki.crosswatch.app",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://community.firecore.com/t/tmdb-and-animes-the-good-way-to-rename/35177",
+    "name": "TMDb and animes - the good way to rename",
+    "snippet": "Nov 22, 2021 — I'd suggest that you pick a short season with a lesser number of episodes and change them to reflect the same numbers as TMDB .",
+    "host_name": "community.firecore.com",
+    "rank": 7,
+    "date": "Nov 22, 2021",
+    "favicon": ""
+  },
+  {
+    "url": "https://anilist.co/forum/thread/3106",
+    "name": "A way to see the discrepancies in my list between MAL and",
+    "snippet": "May 28, 2018 — When I imported my MAL data there was a report at the bottom about which entries werent imported. Ive saved that to a text file and have ... Read more",
+    "host_name": "anilist.co",
+    "rank": 8,
+    "date": "May 28, 2018",
+    "favicon": ""
+  }
+]

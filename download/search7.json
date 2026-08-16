@@ -1,0 +1,83 @@
+[
+  {
+    "url": "https://forums.learnnatively.com/t/suggestion-to-switch-from-tmdb-to-an-other-data-base-like-thetvdb-for-better-anime-season-handling/17575",
+    "name": "Suggestion to Switch from TMDb to an other data base like",
+    "snippet": "Jul 17, 2025 — Hello everyone, I've run into issues with the current database (TheMovieDB/TMDb) not respecting anime season structures.",
+    "host_name": "forums.learnnatively.com",
+    "rank": 0,
+    "date": "Jul 17, 2025",
+    "favicon": ""
+  },
+  {
+    "url": "https://forums.trakt.tv/t/tmdb-anime-series/48457",
+    "name": "TMDB Anime Series - Questions & Help",
+    "snippet": "Mar 1, 2025 — TMDB's handling of anime seasons is becoming an issue since they classify seasons that don't reset episode numbers as a single continuous season ...",
+    "host_name": "forums.trakt.tv",
+    "rank": 1,
+    "date": "Mar 1, 2025",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.themoviedb.org/talk/6996a5a14fbedd07461b0bdb",
+    "name": "Can we please change the anime rules for seasons and",
+    "snippet": "Feb 18, 2026 — I'm reaching out about a recurring issue with how anime seasons /episodes are structured on TMDB . The problem isn't just individual entries — it ...",
+    "host_name": "www.themoviedb.org",
+    "rank": 2,
+    "date": "Feb 18, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://community.firecore.com/t/tmdb-anime-seasons-and-episode-groups/34693",
+    "name": "TMDB anime seasons and episode groups - Suggestions",
+    "snippet": "Oct 12, 2021 — Since the change to TMDB my Anime seasons are all messed up. Since many Anime don't really have seasons they get put in a single season on ...",
+    "host_name": "community.firecore.com",
+    "rank": 3,
+    "date": "Oct 12, 2021",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/jurialmunkey/plugin.video.themoviedb.helper/issues/471",
+    "name": "[BUG] TMDB Helper sends the wrong episode to the player",
+    "snippet": "Mar 29, 2021 — for ' Attack on Titan ' it sends the correct episode, make sure to try a season that is not season 1 ( season 1 works fine for any anime ). The  ...",
+    "host_name": "github.com",
+    "rank": 4,
+    "date": "Mar 29, 2021",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/PleX/comments/1pijd72/anime_consumers_thetvdb_or_themoviedb",
+    "name": "Anime consumers : TheTVDB or TheMovieDB ? : r/PleX",
+    "snippet": "Hello,\n\nOn TheTVDB some animes don't have a page because the moderators decided to fuse it with something of the same universe. Which is some case is OK ...",
+    "host_name": "www.reddit.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.facebook.com/groups/567805250006815/posts/3128375947283053",
+    "name": "What makes Attack on Titan a great series?",
+    "snippet": "Unpredictable storyline and well-developed characters make Attack on Titan a great series , with many recommending it alongside other anime like ...",
+    "host_name": "www.facebook.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://en.wikipedia.org/wiki/Attack_on_Titan",
+    "name": "Attack on Titan",
+    "snippet": "An anime television series was produced by Wit Studio ( seasons 1–3) and MAPPA ( season 4). A 25-episode first season was broadcast from April to September 2013,",
+    "host_name": "en.wikipedia.org",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.instagram.com/p/DXYsmwbiH7S",
+    "name": "Some anime fans are starting to push the idea that major",
+    "snippet": "Some anime fans are starting to push the idea that major story arcs work better as movies instead of full seasons .",
+    "host_name": "www.instagram.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  }
+]
