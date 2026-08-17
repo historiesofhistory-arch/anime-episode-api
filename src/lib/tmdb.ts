@@ -1,4 +1,4 @@
-import { TMDBShow, TMDBSeason, TMDBImages, TMDBEpisode } from './types';
+import { TMDBShow, TMDBSeason, TMDBSeasonMeta, TMDBImages, TMDBEpisode } from './types';
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -111,4 +111,40 @@ export function findEpisodeInSeason(
   tmdbEpNumber: number
 ): TMDBEpisode | undefined {
   return episodes.find(ep => ep.episode_number === tmdbEpNumber);
+}
+
+/**
+ * Fetch ALL episodes for a TMDB show across all seasons (flat list).
+ * Skips season 0 (specials) by default.
+ * Returns episodes sorted by air_date.
+ */
+export async function getAllTmdbEpisodes(tmdbId: number, skipSpecials = true): Promise<TMDBEpisode[]> {
+  const showDetails = await getShowDetails(tmdbId);
+  const seasons = (showDetails as any).seasons || [];
+  const seasonNumbers = seasons
+    .filter((s: TMDBSeasonMeta) => !skipSpecials || s.season_number > 0)
+    .map((s: TMDBSeasonMeta) => s.season_number);
+
+  if (seasonNumbers.length === 0) return [];
+
+  const seasonDataList = await Promise.all(
+    seasonNumbers.map(s => getSeasonEpisodes(tmdbId, s).catch(() => null))
+  );
+
+  const allEps: TMDBEpisode[] = [];
+  for (const sd of seasonDataList) {
+    if (sd?.episodes?.length) {
+      allEps.push(...sd.episodes);
+    }
+  }
+
+  // Sort by air_date, nulls at end
+  allEps.sort((a, b) => {
+    if (!a.air_date && !b.air_date) return 0;
+    if (!a.air_date) return 1;
+    if (!b.air_date) return -1;
+    return a.air_date.localeCompare(b.air_date);
+  });
+
+  return allEps;
 }

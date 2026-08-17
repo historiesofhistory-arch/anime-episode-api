@@ -14,6 +14,8 @@ interface AnilistMediaData {
   format: string | null;
   status: string | null;
   episodes: number | null;
+  startDate: string | null;  // YYYY-MM-DD or null
+  endDate: string | null;    // YYYY-MM-DD or null
   nextAiringEpisode: { episode: number; airingAt: number } | null;
   relations: { edges: { relationType: string; node: { id: number; title: { english: string | null; romaji: string | null }; format: string | null; seasonYear: number | null } }[] } | null;
 }
@@ -36,6 +38,8 @@ query ($id: Int) {
     format
     status
     episodes
+    startDate { year month day }
+    endDate { year month day }
     nextAiringEpisode { episode airingAt }
     relations {
       edges {
@@ -51,6 +55,11 @@ query ($id: Int) {
   }
 }
 `;
+function formatAnilistDate(d: { year: number | null; month: number | null; day: number | null } | undefined | null): string | null {
+  if (!d || !d.year || !d.month || !d.day) return null;
+  return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+}
+
 export async function getAnilistInfo(anilistId: number): Promise<AnilistMediaData> {
   const cached = cache.get(String(anilistId));
   if (cached && Date.now() - cached.ts < CACHE_TTL) {
@@ -82,6 +91,8 @@ export async function getAnilistInfo(anilistId: number): Promise<AnilistMediaDat
     format: media.format ?? null,
     status: media.status ?? null,
     episodes: media.episodes ?? null,
+    startDate: formatAnilistDate(media.startDate),
+    endDate: formatAnilistDate(media.endDate),
     nextAiringEpisode: media.nextAiringEpisode ?? null,
     relations: media.relations ?? null,
   };
