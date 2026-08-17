@@ -207,42 +207,73 @@ export async function GET(
     allEpisodes.sort((a, b) => a.number - b.number);
 
     // ============================================================
-    // PHASE 5: Ongoing extension
+    // PHASE 5: MAL Episode Count Reconciliation
+    //   Triggered when MAL says X episodes but TMDB mapping gave fewer.
+    //   Fetches ALL remaining TMDB seasons (except S0) and flattens them
+    //   into sequential AniList numbering.
+    //   Works for both FINISHED and RELEASING anime.
     // ============================================================
-    if (metaStatus === 'RELEASING' && metaEpisodes && metaEpisodes > allEpisodes.length) {
-      console.log(`[API] Ongoing: source has ${metaEpisodes} eps, mapped ${allEpisodes.length}, extending...`);
+    if (metaEpisodes && metaEpisodes > allEpisodes.length && !isMovieMapping) {
+      const missing = metaEpisodes - allEpisodes.length;
+      console.log(`[API] EP-COUNT MISMATCH: MAL says ${metaEpisodes} eps, mapped ${allEpisodes.length} eps, missing ~${missing}. Reconciling...`);
+
       const existingSeasons = new Set(activeMappings.map(m => m.seasonNumber));
       try {
+        // Get fresh show details to see ALL seasons
         const showInfo = showDetails || await getShowDetails(primaryShowId);
-        const allSeasons = (showInfo as any)?.seasons
-          ?.filter((s: any) => s.season_number > 0 && !existingSeasons.has(s.season_number))
-          .sort((a: any, b: any) => a.season_number - b.season_number) || [];
+        const tmdbSeasons = (showInfo as any)?.seasons || [];
 
-        if (allSeasons.length > 0) {
+        // Collect seasons not yet mapped (skip S0 specials)
+        const unmappedSeasons = tmdbSeasons
+          .filter((s: any) => s.season_number > 0 && !existingSeasons.has(s.season_number))
+          .sort((a: any, b: any) => a.season_number - b.season_number);
+
+        if (unmappedSeasons.length > 0) {
+          console.log(`[API] Found ${unmappedSeasons.length} unmapped TMDB seasons: [${unmappedSeasons.map((s: any) => 'S' + s.season_number).join(', ')}]`);
+
+          // Fetch episodes for all unmapped seasons in parallel
           const extraSeasonData = await Promise.all(
-            allSeasons.map(s => getSeasonEpisodes(primaryShowId, s.season_number).catch(() => null))
+            unmappedSeasons.map(s => getSeasonEpisodes(primaryShowId, s.season_number).catch(() => null))
           );
-          let alFrom = allEpisodes.length + 1;
+
+          // Sequentially map each season's episodes, continuing from where we left off
+          let nextAnilistNum = allEpisodes.length + 1;
           for (let i = 0; i < extraSeasonData.length; i++) {
             const sd = extraSeasonData[i];
-            const sNum = allSeasons[i].season_number;
-            if (!sd?.episodes?.length) continue;
+            const sNum = unmappedSeasons[i].season_number;
+            if (!sd?.episodes?.length) {
+              console.log(`[API] S${sNum} has no episodes, skipping`);
+              continue;
+            }
+
             const epNums = sd.episodes.map(e => e.episode_number).sort((a, b) => a - b);
             const extMapping: TMDBSeasonMapping = {
               tmdbShowId: primaryShowId,
               seasonNumber: sNum,
-              anilistRange: { from: alFrom, to: alFrom + epNums.length - 1 },
+              anilistRange: { from: nextAnilistNum, to: nextAnilistNum + epNums.length - 1 },
               tmdbRange: { from: epNums[0], to: epNums[epNums.length - 1] },
             };
+
             const extraEps = mapEpisodesForSeason(sd.episodes, extMapping, anilistId);
             allEpisodes.push(...extraEps);
-            alFrom += epNums.length;
-            console.log(`[API] Extended S${sNum}: +${epNums.length} eps (TMDB E${epNums[0]}-E${epNums[epNums.length-1]})`);
+            console.log(`[API] Reconciled S${sNum}: +${epNums.length} eps (TMDB E${epNums[0]}-E${epNums[epNums.length-1]}) → AniList E${nextAnilistNum}-E${nextAnilistNum + epNums.length - 1}`);
+            nextAnilistNum += epNums.length;
           }
+
+          // Re-sort after adding all episodes
           allEpisodes.sort((a, b) => a.number - b.number);
+
+          // Post-reconciliation check
+          if (allEpisodes.length < metaEpisodes) {
+            console.log(`[API] After reconciliation: ${allEpisodes.length}/${metaEpisodes} eps. TMDB may not have all episodes.`);
+          } else {
+            console.log(`[API] Reconciliation complete: ${allEpisodes.length} eps (MAL expected ${metaEpisodes})`);
+          }
+        } else {
+          console.log(`[API] No unmapped TMDB seasons found. TMDB may have incomplete data for this show.`);
         }
       } catch (e) {
-        console.error(`[API] Ongoing extension failed:`, e);
+        console.error(`[API] Episode count reconciliation failed:`, e);
       }
     }
 
