@@ -208,14 +208,25 @@ export async function GET(
 
     // ============================================================
     // PHASE 5: MAL Episode Count Reconciliation
-    //   Triggered when MAL says X episodes but TMDB mapping gave fewer.
+    //   Triggered when MAL/AniList says X episodes but TMDB mapping gave fewer.
+    //   Also triggers for ongoing shows: if nextAiringEpisode.episode > mapped eps.
     //   Fetches ALL remaining TMDB seasons (except S0) and flattens them
     //   into sequential AniList numbering.
     //   Works for both FINISHED and RELEASING anime.
     // ============================================================
-    if (metaEpisodes && metaEpisodes > allEpisodes.length && !isMovieMapping) {
-      const missing = metaEpisodes - allEpisodes.length;
-      console.log(`[API] EP-COUNT MISMATCH: MAL says ${metaEpisodes} eps, mapped ${allEpisodes.length} eps, missing ~${missing}. Reconciling...`);
+
+    // Determine expected episode count from multiple sources
+    // MAL returns 0 for ongoing shows without fixed count, so we use nextAiring as fallback
+    const expectedEps = (metaEpisodes && metaEpisodes > 0)
+      ? metaEpisodes
+      : (anilistNextAiringEpisode?.episode
+        ? anilistNextAiringEpisode.episode - 1  // nextAiring=1175 means 1174 have aired
+        : 0);
+
+    if (expectedEps > 0 && expectedEps > allEpisodes.length && !isMovieMapping) {
+      const missing = expectedEps - allEpisodes.length;
+      const source = metaEpisodes && metaEpisodes > 0 ? 'MAL' : 'nextAiringEpisode';
+      console.log(`[API] EP-COUNT MISMATCH (${source}): expected ${expectedEps} eps, mapped ${allEpisodes.length} eps, missing ~${missing}. Reconciling...`);
 
       const existingSeasons = new Set(activeMappings.map(m => m.seasonNumber));
       try {
@@ -264,10 +275,10 @@ export async function GET(
           allEpisodes.sort((a, b) => a.number - b.number);
 
           // Post-reconciliation check
-          if (allEpisodes.length < metaEpisodes) {
-            console.log(`[API] After reconciliation: ${allEpisodes.length}/${metaEpisodes} eps. TMDB may not have all episodes.`);
+          if (allEpisodes.length < expectedEps) {
+            console.log(`[API] After reconciliation: ${allEpisodes.length}/${expectedEps} eps. TMDB may not have all episodes.`);
           } else {
-            console.log(`[API] Reconciliation complete: ${allEpisodes.length} eps (MAL expected ${metaEpisodes})`);
+            console.log(`[API] Reconciliation complete: ${allEpisodes.length} eps (expected ${expectedEps})`);
           }
         } else {
           console.log(`[API] No unmapped TMDB seasons found. TMDB may have incomplete data for this show.`);

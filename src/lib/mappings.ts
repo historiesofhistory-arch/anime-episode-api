@@ -2,11 +2,11 @@ import { AnilistMapping, TMDBSeasonMapping, EpisodeRange } from './types';
 import path from 'path';
 import fs from 'fs';
 
-// Parse a range string like "1-13" or "1" into {from, to}
+// Parse a range string like "1-13", "1", or open-ended "1089-" into {from, to}
 function parseRange(rangeStr: string): EpisodeRange {
-  const parts = rangeStr.split('-').map(Number);
-  const from = parts[0] || 0;
-  const to = parts.length > 1 ? parts[1] : from;
+  const parts = rangeStr.split('-');
+  const from = Number(parts[0]) || 0;
+  const to = (parts.length > 1 && parts[1] !== '') ? (Number(parts[1]) || 0) : from;
   return { from, to };
 }
 
