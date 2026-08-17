@@ -60,6 +60,17 @@ function formatDateAL(d: { year: number | null; month: number | null; day: numbe
   return `${d.year}-${String(d.month ?? 0).padStart(2, '0')}-${String(d.day ?? 0).padStart(2, '0')}`;
 }
 
+// ====== Date Helpers ======
+
+function parseDate(d: string): number {
+  const [y, m, day] = d.split('-').map(Number);
+  return Date.UTC(y, m - 1, day);
+}
+
+function daysToMs(days: number): number {
+  return days * 24 * 60 * 60 * 1000;
+}
+
 // ====== Title Parsing ======
 
 function extractRootName(title: string): string {
@@ -232,13 +243,27 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
   const tmdbResults = await searchTmdb(result.rootName).catch(e => { result.errors.push(`TMDB search: ${e.message}`); return []; });
   if (!tmdbResults.length) { result.errors.push(`No TMDB results for "${result.rootName}"`); return result; }
 
-  // Step 4: Verify by S1 date match
+  // Step 4: Verify by S1 date match (exact first, then ±1 day)
   let matchedShow: TmdbSearchResult | null = null;
   for (const r of tmdbResults.slice(0, 5)) {
     const s1Date = r.first_air_date?.substring(0, 10) || '';
     if (s1Date && s1Date === rootStartDate) {
       matchedShow = r;
       break;
+    }
+  }
+  // ±1 day tolerance for S1 verification
+  if (!matchedShow && rootStartDate) {
+    const rootMs = parseDate(rootStartDate);
+    const tol = daysToMs(1);
+    for (const r of tmdbResults.slice(0, 5)) {
+      const s1Date = r.first_air_date?.substring(0, 10) || '';
+      if (!s1Date) continue;
+      const s1Ms = parseDate(s1Date);
+      if (s1Ms >= rootMs - tol && s1Ms <= rootMs + tol) {
+        matchedShow = r;
+        break;
+      }
     }
   }
   if (!matchedShow) {
@@ -253,20 +278,61 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
   });
   if (!allEps.length) { result.errors.push('No TMDB episodes found'); return result; }
 
-  // Step 6: Match by date range
+  // Step 6: Match by date range (exact first, then ±1 day tolerance)
   if (!result.startDate) { result.errors.push('No AniList startDate'); return result; }
 
-  const firstMatch = allEps.find(e => e.ep.air_date != null && e.ep.air_date === result.startDate);
-  // For lastMatch: try exact endDate, else fall back to last available episode from startDate
-  const lastMatch = result.endDate
-    ? (allEps.find(e => e.ep.air_date != null && e.ep.air_date === result.endDate)
-       ?? allEps.filter(e => e.ep.air_date != null && e.ep.air_date >= result.startDate).pop())
-    : allEps.filter(e => e.ep.air_date != null && e.ep.air_date >= result.startDate).pop();
+  const startMs = parseDate(result.startDate);
+  const endMs = result.endDate ? parseDate(result.endDate) : null;
+  const ONE_DAY = daysToMs(1);
+
+  // PASS 1: Exact date match for first episode
+  let firstMatch = allEps.find(e => e.ep.air_date != null && e.ep.air_date === result.startDate);
+  let firstMatchMethod = 'exact';
+
+  // PASS 2: ±1 day tolerance for first episode (only if exact failed)
+  if (!firstMatch) {
+    const effectiveStart = startMs - ONE_DAY;
+    firstMatch = allEps.find(e => {
+      if (!e.ep.air_date) return false;
+      const epMs = parseDate(e.ep.air_date);
+      return epMs >= effectiveStart && epMs <= startMs + ONE_DAY;
+    });
+    firstMatchMethod = 'tolerance';
+  }
+
+  // Match last episode: exact endDate first, then ±1 day, then fallback to last from startDate
+  let lastMatch: { ep: TMDBEpisode; season_number: number } | undefined;
+  let lastMatchMethod = 'exact';
+  if (result.endDate) {
+    lastMatch = allEps.find(e => e.ep.air_date != null && e.ep.air_date === result.endDate);
+    if (!lastMatch) {
+      // ±1 day tolerance for endDate
+      const effectiveEnd = endMs + ONE_DAY;
+      const effectiveEndStart = endMs - ONE_DAY;
+      lastMatch = [...allEps].reverse().find(e => {
+        if (!e.ep.air_date) return false;
+        const epMs = parseDate(e.ep.air_date);
+        return epMs >= effectiveEndStart && epMs <= effectiveEnd && epMs >= startMs;
+      });
+      lastMatchMethod = 'tolerance';
+    }
+  }
+  // Fallback: last available episode from startDate (with tolerance)
+  if (!lastMatch) {
+    const effectiveStart = startMs - ONE_DAY;
+    lastMatch = [...allEps].reverse().find(e => {
+      if (!e.ep.air_date) return false;
+      return parseDate(e.ep.air_date) >= effectiveStart;
+    });
+    lastMatchMethod = 'fallback';
+  }
 
   if (!firstMatch) {
-    result.errors.push(`No TMDB episode with air_date="${result.startDate}"`);
+    result.errors.push(`No TMDB episode with air_date near "${result.startDate}" (±1 day)`);
     return result;
   }
+
+  console.log(`[DATE-MAP] First ep match: ${firstMatchMethod}, Last ep match: ${lastMatchMethod}`);
 
   // Build episode list and mapping
   const startS = firstMatch.season_number;
@@ -279,10 +345,13 @@ export async function dateBasedMapping(anilistId: number): Promise<DateMappingRe
     endE = lastMatch.ep.episode_number;
   }
 
-  // Collect all episodes in range
+  // Collect all episodes in range (with ±1 day tolerance on both boundaries)
+  const effectiveStart = startMs - ONE_DAY;
+  const effectiveEnd = endMs ? endMs + ONE_DAY : null;
   const epsInRange = allEps.filter(e => {
     if (!e.ep.air_date) return false;
-    return e.ep.air_date >= result.startDate && (!result.endDate || e.ep.air_date <= result.endDate);
+    const epMs = parseDate(e.ep.air_date);
+    return epMs >= effectiveStart && (effectiveEnd === null || epMs <= effectiveEnd);
   });
 
   result.episodes = epsInRange.map(e => ({ ep: e.ep, season: e.season_number }));
